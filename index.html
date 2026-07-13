@@ -56,6 +56,26 @@ button{font-family:inherit}
 .jpi s{text-decoration:none;font-family:var(--display);font-size:calc(var(--cell)*.05);color:var(--accent)}
 .jpi em{font-style:normal;font-family:var(--mono);font-size:calc(var(--cell)*.026);color:var(--mute2)}
 
+/* draw-game results strip — Powerball, Pick 3 &c., fetched live from texaslottery.com */
+.dw{display:flex;gap:calc(var(--cell)*.018);padding:calc(var(--cell)*.02) calc(var(--cell)*.03);
+  background:var(--barBg);border-top:1px solid var(--tileBd);flex:0 0 auto;backdrop-filter:blur(4px)}
+.dwi{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+  gap:calc(var(--cell)*.012);padding:calc(var(--cell)*.02) calc(var(--cell)*.012);border-radius:calc(var(--cell)*.02);
+  background:var(--tile);border:1px solid var(--tileBd);text-align:center;overflow:hidden}
+.dwi .glogo{height:calc(var(--cell)*.075);max-width:92%;object-fit:contain}
+.dwi .gname{font-family:var(--display);font-size:calc(var(--cell)*.032);line-height:1;white-space:nowrap}
+.dwi .amt{font-family:var(--display);font-size:calc(var(--cell)*.052);color:var(--accent);line-height:1;white-space:nowrap}
+.dwi .amt.alert{color:#FF4D4D}
+.dwi .lbl{font-family:var(--mono);font-weight:700;font-size:calc(var(--cell)*.02);letter-spacing:.06em;
+  text-transform:uppercase;color:var(--mute);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.dwi .balls{display:flex;gap:calc(var(--cell)*.006);flex-wrap:wrap;justify-content:center}
+.dwi .balls i{font-style:normal;font-family:var(--mono);font-weight:800;
+  width:calc(var(--cell)*.055);height:calc(var(--cell)*.055);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:calc(var(--cell)*.027);
+  background:#fff;color:#14161C;border:1px solid rgba(0,0,0,.18)}
+.dwi .balls i.sp{background:#E11D2E;color:#fff;border-color:#E11D2E}
+.dwi .balls i.fb{background:#F5A623;color:#14161C;border-color:#F5A623}
+
 .stage{flex:1 1 auto;display:flex;min-height:0}
 .grid{flex:1 1 auto;display:grid;grid-template-columns:repeat(var(--cols),1fr);grid-auto-rows:1fr;
   gap:calc(var(--cell)*.022);padding:calc(var(--cell)*.025);min-height:0}
@@ -305,6 +325,7 @@ tr:hover td{background:var(--r-lt)}
     <div class="grid anim" id="bGrid"></div>
     <div class="rail hidden" id="bRail"></div>
   </div>
+  <div class="dw hidden" id="bDraws"></div>
 </div>
 <div class="chrome" id="chrome">
   <span class="cbtn" id="link" style="cursor:default">● …</span>
@@ -583,7 +604,7 @@ const newStore=(name)=>({
   id:'s'+Math.random().toString(36).slice(2,8),name,
   brand:{title:name,sub:'Scratch-Offs',logo:'',theme:'texas',accent:'#D62828',
          bgType:'theme',bgImage:'',bgVideo:''},
-  view:{cols:5,empty:'show',sort:'slot',endingAt:3,tile:'card',showJp:true,showAds:true,showWinners:true,adSecs:8},
+  view:{cols:5,empty:'show',sort:'slot',endingAt:3,tile:'card',showJp:true,showDraws:true,showAds:true,showWinners:true,adSecs:8},
   games:blankGames(),ads:[],jackpots:[],winners:[],sales:{},managers:[],feedUrl:''
 });
 const fresh=()=>{const s=newStore('Swing by Maypearl');return{stores:[s],active:s.id,
@@ -650,6 +671,39 @@ const pickImage=(max=380)=>new Promise(res=>{
 });
 
 /* ---------------- THE BOARD ---------------- */
+/* Draw-game results (Powerball, Pick 3, ...) — server.py scrapes the texaslottery.com
+   homepage for us and caches it, so the board just polls /api/txdraws now and then. */
+let DRAWS=null;
+async function loadDraws(){
+  if(!SERVED)return;
+  try{
+    const r=await fetch('/api/txdraws',{cache:'no-store'});
+    const j=await r.json();
+    if(j.ok&&j.games&&j.games.length){
+      DRAWS=j.games;
+      if(!location.hash||location.hash==='#board')renderBoard();
+    }
+  }catch(_){/* offline is fine — the strip just stays hidden */}
+}
+setInterval(loadDraws,10*60*1000);
+function renderDraws(st){
+  const el=$('#bDraws');
+  const on=st.view.showDraws!==false&&DRAWS&&DRAWS.length;
+  el.classList.toggle('hidden',!on);
+  if(!on){el.innerHTML='';return}
+  el.innerHTML=DRAWS.map(g=>{
+    const r=(g.results&&g.results[0])||null;
+    return `<div class="dwi">
+      ${g.logo?`<img class="glogo" src="${esc(imgSrc(g.logo))}" alt="${esc(g.name)}"
+          onerror="this.outerHTML='<div class=&quot;gname&quot;>${esc(g.name)}</div>'">`
+        :`<div class="gname">${esc(g.name)}</div>`}
+      ${g.amount?`<div class="amt ${g.alert?'alert':''}">${esc(g.amount)}</div>`:''}
+      ${g.next?`<div class="lbl">Next draw ${esc(g.next)}</div>`:''}
+      ${r?`<div class="lbl">${r.label?esc(r.label)+' · ':''}${esc(r.date)}</div>
+        <div class="balls">${r.nums.map(n=>`<i class="${n.cls==='fireball'?'fb':n.cls?'sp':''}">${esc(n.n)}</i>`).join('')}</div>`:''}
+    </div>`;
+  }).join('');
+}
 let adTimer=null,adIdx=0;
 function applyTheme(st){
   const t=THEMES[st.brand.theme]||THEMES.texas, r=document.documentElement.style;
@@ -758,6 +812,9 @@ function renderBoard(){
   if(st.view.showJp&&st.jackpots.length){jp.classList.remove('hidden');
     jp.innerHTML=st.jackpots.map(j=>`<div class="jpi"><b>${esc(j.game)}</b><s>${esc(j.amount)}</s>${j.draw?`<em>${esc(j.draw)}</em>`:''}</div>`).join('');
   }else jp.classList.add('hidden');
+
+  // live draw results — set visibility before fitGrid measures the stage
+  renderDraws(st);
 
   // stage: spotlight or grid
   const grid=$('#bGrid');
@@ -969,7 +1026,15 @@ function tabAds(st){
       </tbody></table></div></div>`;
 }
 function tabJp(st){
-  return `<div class="panel"><div class="ph"><h3>Current jackpots</h3>
+  return `<div class="panel"><div class="ph"><h3>Live draw results</h3>
+      <span class="hint">Powerball, Mega Millions, Pick 3 &amp; the rest — fetched from texaslottery.com every 10 minutes</span>
+      <div class="sp"></div>
+      <label class="chk"><input type="checkbox" id="dwOn" ${st.view.showDraws!==false?'checked':''}> Show on TV</label></div>
+    <div class="pb"><div class="note"><div><b>This strip is automatic.</b> When the app runs under <code>server.py</code>, the server reads the
+      texaslottery.com homepage — jackpots, next draw dates and winning numbers — and shows all eight draw games along the bottom of the TV.
+      No typing needed. The jackpot list below is the old manual strip; you can keep both on, or turn one off.</div></div></div></div>
+
+  <div class="panel"><div class="ph"><h3>Current jackpots</h3>
       <span class="hint">Shown in the strip under the header</span><div class="sp"></div>
       <label class="chk"><input type="checkbox" id="jpOn" ${st.view.showJp?'checked':''}> Show on TV</label>
       <button class="btn sm go" id="jpAdd">Add jackpot</button></div>
@@ -1223,6 +1288,7 @@ $('#aBody').addEventListener('change',e=>{
   if(el.id==='bAcc'){st.brand.accent=el.value;save();reRender()}
   if(el.id==='adOn'){st.view.showAds=el.checked;save()}
   if(el.id==='jpOn'){st.view.showJp=el.checked;save()}
+  if(el.id==='dwOn'){st.view.showDraws=el.checked;save()}
   if(el.id==='wOn'){st.view.showWinners=el.checked;save()}
   if(el.dataset.swap!=null&&el.value!==''){
     const i=+el.dataset.swap,j=+el.value;
@@ -1406,6 +1472,7 @@ setInterval(()=>{if(!location.hash||location.hash==='#board')renderBoard()},5000
     if(j.state&&j.state.stores&&j.state.stores.length){db=j.state;local.set(db)}
     else{push()}                       // first run: seed the server from this browser
     route();setLink(true);
+    loadDraws();
   }catch(e){SERVED=false;setLink(false)}
 })();
 

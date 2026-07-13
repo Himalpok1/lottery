@@ -2,3 +2,5 @@ board-state.json
 art/
 __pycache__/
 .DS_Store
+tx-draws.json
+.claude/

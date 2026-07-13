@@ -23,6 +23,7 @@ import json
 import re
 import os
 import sys
+import time
 import hashlib
 import urllib.request
 import urllib.parse
@@ -60,6 +61,46 @@ def fetch_art(no):
 
 _lock = threading.Lock()
 _rev = 0
+
+# Draw-game results (Powerball, Pick 3, ...) scraped off the texaslottery.com homepage.
+# The TV polls /api/txdraws; we hit the state site at most once per TTL and keep the
+# last good copy on disk so a restart with no internet still has something to show.
+DRAWS_FILE = "tx-draws.json"
+DRAWS_TTL = 10 * 60  # seconds between visits to texaslottery.com
+_draws_lock = threading.Lock()
+_draws = {"at": 0.0, "games": None}
+
+
+def _load_draws_file():
+    try:
+        with open(DRAWS_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def get_draws():
+    """Returns (games, fresh) — cached, refetched when stale, stale beats nothing."""
+    with _draws_lock:
+        if _draws["games"] is None:
+            _draws["games"] = _load_draws_file()
+        if _draws["games"] is not None and time.time() - _draws["at"] < DRAWS_TTL:
+            return _draws["games"], True
+        try:
+            import tx_draws_fetch
+            games, note = tx_draws_fetch.fetch_draws()
+            _draws["games"] = games
+            _draws["at"] = time.time()
+            tmp = DRAWS_FILE + ".tmp"
+            with open(tmp, "w") as f:
+                json.dump(games, f, indent=1)
+            os.replace(tmp, DRAWS_FILE)
+            print(f"  [draws] fetched live from texaslottery.com — {note}")
+            return games, True
+        except Exception as e:
+            print(f"  [draws] fetch failed: {e}")
+            _draws["at"] = time.time()  # don't hammer the site after a failure
+            return _draws["games"], False
 
 
 def load_state():
@@ -106,6 +147,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._json({"rev": _rev})
         if self.path.startswith("/api/state"):
             return self._json({"rev": _rev, "state": _state})
+        # Draw-game results for the TV's strip. Read-only, so no PIN — the board
+        # polls this without anyone typing anything.
+        if self.path.startswith("/api/txdraws"):
+            games, fresh = get_draws()
+            if games is None:
+                return self._json({"ok": False, "error": "texaslottery.com unreachable"}, 502)
+            return self._json({"ok": True, "fresh": fresh, "games": games})
         # Ticket art, served from our own machine.
         # texaslottery.com can refuse hotlinked images, and the TV may have no internet at
         # all — so we fetch each picture once, keep it in art/, and serve it from here.
