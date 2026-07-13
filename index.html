@@ -141,6 +141,11 @@ button{font-family:inherit}
   font-family:var(--mono);font-weight:800;font-size:calc(var(--cell)*.13);line-height:1;
   padding:calc(var(--cell)*.035) calc(var(--cell)*.055);border-radius:0 0 calc(var(--cell)*.04) 0;
   box-shadow:0 2px 6px rgba(0,0,0,.25);z-index:2}
+/* the ticket price — same colour as its price-tier dot in the legend up top */
+.priceB{position:absolute;right:0;top:0;background:var(--c);color:#fff;
+  font-family:var(--mono);font-weight:800;font-size:calc(var(--cell)*.13);line-height:1;
+  padding:calc(var(--cell)*.035) calc(var(--cell)*.055);border-radius:0 0 0 calc(var(--cell)*.04);
+  box-shadow:0 2px 6px rgba(0,0,0,.25);z-index:2}
 /* the state's own CLOSING SOON corner ribbon */
 .ribbon{position:absolute;right:0;bottom:0;width:60%;height:60%;overflow:hidden;z-index:2;pointer-events:none}
 .ribbon i{position:absolute;right:-32%;bottom:18%;width:150%;transform:rotate(-45deg);transform-origin:center;
@@ -668,6 +673,7 @@ function cardTile(g,i,st,mods={}){
   return `<div class="tc ${mods.dim?'dim':''} ${mods.pick?'pick':''}" style="--i:${i};--c:${c}">
     <div class="tcArt">
       <div class="slotB">${String(g.slot).padStart(2,'0')}</div>
+      ${g.price!==''?`<div class="priceB">$${esc(g.price)}</div>`:''}
       ${g.img?`${imgTag(g)}<div class="pxy" style="display:none"><b>${g.price!==''?'$'+esc(g.price):'—'}</b><s>${g.no?'#'+esc(g.no):''}</s></div>`
              :`<div class="pxy"><b>${g.price!==''?'$'+esc(g.price):'—'}</b><s>${g.no?'#'+esc(g.no):'no picture'}</s></div>`}
       ${g.closing?`<div class="ribbon"><i>CLOSING SOON</i></div>`:''}
