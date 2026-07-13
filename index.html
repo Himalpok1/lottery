@@ -69,8 +69,9 @@ button{font-family:inherit}
 .tk.pick{outline:calc(var(--cell)*.012) solid var(--c);outline-offset:-2px;background:var(--tile);filter:brightness(1.06)}
 .tk.empty{background:transparent;border-style:dashed}
 
-.tkArt{flex:1 1 auto;position:relative;display:flex;align-items:center;justify-content:center;min-height:0}
-.tkArt img{width:100%;height:100%;object-fit:cover;display:block}
+.tkArt{flex:1 1 auto;position:relative;display:flex;align-items:center;justify-content:center;min-height:0;overflow:hidden}
+.tkArt img{position:absolute;left:50%;bottom:0;transform:translateX(-50%);
+  width:122%;height:122%;object-fit:cover;display:block}
 .tkArt .noart{font-family:var(--mono);font-size:calc(var(--cell)*.03);color:var(--mute2);text-align:center;padding:calc(var(--cell)*.03)}
 /* price chip, slot no, game no — laid over the art like the real thing */
 .chipL{position:absolute;left:calc(var(--cell)*.02);top:calc(var(--cell)*.02);background:var(--chipBg);color:var(--chipInk);
@@ -127,7 +128,10 @@ button{font-family:inherit}
 .tc.empty{background:transparent;border:1px dashed var(--tileBd);box-shadow:none}
 .tcArt{flex:1 1 auto;position:relative;min-height:0;display:flex;align-items:center;justify-content:center;
   overflow:hidden}
-.tcArt img{width:100%;height:100%;object-fit:cover;display:block}
+/* zoom in and anchor to the bottom, cropping off the price/game-number strip the
+   state prints across the top of every ticket photo — our own slot badge covers that job */
+.tcArt img{position:absolute;left:50%;bottom:0;transform:translateX(-50%);
+  width:122%;height:122%;object-fit:cover;display:block}
 .tcArt .noart{font-family:var(--mono);font-size:calc(var(--cell)*.03);color:#9CA3AF;text-align:center;line-height:1.4;padding:calc(var(--cell)*.03)}
 .tcArt .pxy{font-family:var(--display);color:#111827;text-align:center;line-height:1.05;padding:calc(var(--cell)*.03)}
 .tcArt .pxy b{display:block;font-size:calc(var(--cell)*.075)}
