@@ -59,6 +59,8 @@ button{font-family:inherit}
 .stage{flex:1 1 auto;display:flex;min-height:0}
 .grid{flex:1 1 auto;display:grid;grid-template-columns:repeat(var(--cols),1fr);grid-auto-rows:1fr;
   gap:calc(var(--cell)*.022);padding:calc(var(--cell)*.025);min-height:0}
+/* square tiles: sized to explicit px tracks by fitGrid(), centered instead of stretched */
+.grid.square{flex:0 0 auto;margin:auto}
 
 /* a ticket tile */
 .tk{position:relative;display:flex;flex-direction:column;border-radius:calc(var(--cell)*.02);overflow:hidden;
@@ -710,6 +712,26 @@ function spotlight(g,st,kick){
       </div>
     </div></div>`;
 }
+/* size the grid's tiles as big a square as fits cols x rows in the space we have,
+   then center it — so tile art is always square, never stretched */
+function fitGrid(cols,total){
+  const stage=$('.stage'),grid=$('#bGrid'),rail=$('#bRail');
+  if(!stage||!grid)return;
+  const rows=Math.max(1,Math.ceil(total/cols));
+  const railW=(rail&&!rail.classList.contains('hidden'))?rail.getBoundingClientRect().width:0;
+  const availW=stage.clientWidth-railW,availH=stage.clientHeight;
+  if(availW<=0||availH<=0)return;
+  const GAP=.022,PAD=.05; // matches the .grid gap/padding formulas below, both in units of --cell
+  const cell=Math.max(20,Math.floor(Math.min(
+    availW/(cols+(cols-1)*GAP+PAD),
+    availH/(rows+(rows-1)*GAP+PAD)
+  )));
+  grid.style.setProperty('--cell',cell+'px');
+  grid.style.gridTemplateColumns=`repeat(${cols},${cell}px)`;
+  grid.style.gridTemplateRows=`repeat(${rows},${cell}px)`;
+}
+window.addEventListener('resize',()=>{if(lastGridFit)fitGrid(...lastGridFit)});
+let lastGridFit=null;
 function renderBoard(){
   const st=S(),cmd=db.cmd||{mode:'all'};
   applyTheme(st);renderBg(st);
@@ -735,13 +757,15 @@ function renderBoard(){
   if(mode==='recommended'){
     const g=recommended(st.games);
     grid.className='grid';grid.style.display='block';
+    grid.style.gridTemplateColumns='';grid.style.gridTemplateRows='';lastGridFit=null;
     grid.innerHTML=g?spotlight(g,st,'Recommended game'):'<div class="spot"><div class="info"><h2>Add prize data to get a recommendation</h2></div></div>';
   }else if(mode==='number'){
     const g=st.games.find(x=>String(x.slot)===String(cmd.value)||String(x.no)===String(cmd.value));
     grid.className='grid';grid.style.display='block';
+    grid.style.gridTemplateColumns='';grid.style.gridTemplateRows='';lastGridFit=null;
     grid.innerHTML=g&&filled(g)?spotlight(g,st,'Ticket '+cmd.value):`<div class="spot"><div class="info"><h2>No ticket at ${esc(cmd.value)}</h2></div></div>`;
   }else{
-    grid.className='grid anim';grid.style.display='';
+    grid.className='grid anim square';grid.style.display='';
     const list=shownGames(st);
     const slots=mode==='slots'?recSlots(st.games,st.view.endingAt):null;
     grid.innerHTML=list.map((g,i)=>{
@@ -754,6 +778,8 @@ function renderBoard(){
       if(!filled(g))dim=dim||mode!=='all';
       return ticketTile(g,i,st,{dim,pick});
     }).join('');
+    lastGridFit=[+st.view.cols||5,list.length];
+    fitGrid(...lastGridFit);
   }
 
   // rail: ads + winners
