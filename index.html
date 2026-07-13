@@ -56,22 +56,28 @@ button{font-family:inherit}
 .jpi s{text-decoration:none;font-family:var(--display);font-size:calc(var(--cell)*.05);color:var(--accent)}
 .jpi em{font-style:normal;font-family:var(--mono);font-size:calc(var(--cell)*.026);color:var(--mute2)}
 
-/* draw-game results strip — Powerball, Pick 3 &c., fetched live from texaslottery.com */
-.dw{display:flex;gap:calc(var(--cell)*.018);padding:calc(var(--cell)*.02) calc(var(--cell)*.03);
-  background:var(--barBg);border-top:1px solid var(--tileBd);flex:0 0 auto;backdrop-filter:blur(4px)}
-.dwi{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
-  gap:calc(var(--cell)*.012);padding:calc(var(--cell)*.02) calc(var(--cell)*.012);border-radius:calc(var(--cell)*.02);
-  background:var(--tile);border:1px solid var(--tileBd);text-align:center;overflow:hidden}
-.dwi .glogo{height:calc(var(--cell)*.075);max-width:92%;object-fit:contain}
-.dwi .gname{font-family:var(--display);font-size:calc(var(--cell)*.032);line-height:1;white-space:nowrap}
+/* draw-game results ticker — Powerball, Pick 3 &c., fetched live from texaslottery.com,
+   crawling along the bottom like a news channel. The track holds the games twice over;
+   sliding it half its own width and looping reads as one endless belt. */
+.dw{display:block;padding:0;overflow:hidden;background:var(--barBg);
+  border-top:1px solid var(--tileBd);flex:0 0 auto;backdrop-filter:blur(4px)}
+.dwTrack{display:inline-flex;white-space:nowrap;will-change:transform;
+  animation:crawl var(--dwSecs,80s) linear infinite}
+@keyframes crawl{to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.dwTrack{animation:none}}
+.dwHalf{display:inline-flex;align-items:center}
+.dwi{display:inline-flex;align-items:center;gap:calc(var(--cell)*.02);
+  padding:calc(var(--cell)*.022) calc(var(--cell)*.045);border-right:1px solid var(--tileBd)}
+.dwi .glogo{height:calc(var(--cell)*.08);object-fit:contain}
+.dwi .gname{font-family:var(--display);font-size:calc(var(--cell)*.04);line-height:1;white-space:nowrap}
 .dwi .amt{font-family:var(--display);font-size:calc(var(--cell)*.052);color:var(--accent);line-height:1;white-space:nowrap}
 .dwi .amt.alert{color:#FF4D4D}
-.dwi .lbl{font-family:var(--mono);font-weight:700;font-size:calc(var(--cell)*.02);letter-spacing:.06em;
-  text-transform:uppercase;color:var(--mute);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
-.dwi .balls{display:flex;gap:calc(var(--cell)*.006);flex-wrap:wrap;justify-content:center}
+.dwi .lbl{font-family:var(--mono);font-weight:700;font-size:calc(var(--cell)*.026);letter-spacing:.06em;
+  text-transform:uppercase;color:var(--mute);white-space:nowrap}
+.dwi .balls{display:inline-flex;gap:calc(var(--cell)*.007)}
 .dwi .balls i{font-style:normal;font-family:var(--mono);font-weight:800;
-  width:calc(var(--cell)*.055);height:calc(var(--cell)*.055);border-radius:50%;
-  display:flex;align-items:center;justify-content:center;font-size:calc(var(--cell)*.027);
+  width:calc(var(--cell)*.06);height:calc(var(--cell)*.06);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:calc(var(--cell)*.029);
   background:#fff;color:#14161C;border:1px solid rgba(0,0,0,.18)}
 .dwi .balls i.sp{background:#E11D2E;color:#fff;border-color:#E11D2E}
 .dwi .balls i.fb{background:#F5A623;color:#14161C;border-color:#F5A623}
@@ -604,7 +610,7 @@ const newStore=(name)=>({
   id:'s'+Math.random().toString(36).slice(2,8),name,
   brand:{title:name,sub:'Scratch-Offs',logo:'',theme:'texas',accent:'#D62828',
          bgType:'theme',bgImage:'',bgVideo:''},
-  view:{cols:5,empty:'show',sort:'slot',endingAt:3,tile:'card',showJp:true,showDraws:true,showAds:true,showWinners:true,adSecs:8},
+  view:{cols:'auto',empty:'show',sort:'slot',endingAt:3,tile:'card',showJp:true,showDraws:true,showAds:true,showWinners:true,adSecs:8},
   games:blankGames(),ads:[],jackpots:[],winners:[],sales:{},managers:[],feedUrl:''
 });
 const fresh=()=>{const s=newStore('Swing by Maypearl');return{stores:[s],active:s.id,
@@ -690,8 +696,8 @@ function renderDraws(st){
   const el=$('#bDraws');
   const on=st.view.showDraws!==false&&DRAWS&&DRAWS.length;
   el.classList.toggle('hidden',!on);
-  if(!on){el.innerHTML='';return}
-  el.innerHTML=DRAWS.map(g=>{
+  if(!on){el.innerHTML='';el.dataset.key='';return}
+  const items=DRAWS.map(g=>{
     const r=(g.results&&g.results[0])||null;
     return `<div class="dwi">
       ${g.logo?`<img class="glogo" src="${esc(imgSrc(g.logo))}" alt="${esc(g.name)}"
@@ -703,13 +709,21 @@ function renderDraws(st){
         <div class="balls">${r.nums.map(n=>`<i class="${n.cls==='fireball'?'fb':n.cls?'sp':''}">${esc(n.n)}</i>`).join('')}</div>`:''}
     </div>`;
   }).join('');
+  // the board redraws itself every few seconds — only rebuild the ticker when its
+  // content actually changed, or the crawl would visibly jump back to the start
+  if(el.dataset.key===items)return;
+  el.dataset.key=items;
+  el.innerHTML=`<div class="dwTrack"><div class="dwHalf">${items}</div><div class="dwHalf">${items}</div></div>`;
+  // pace the crawl by how much there is to read, not by a fixed lap time
+  requestAnimationFrame(()=>{const t=el.firstElementChild;
+    if(t)t.style.setProperty('--dwSecs',Math.max(30,Math.round(t.scrollWidth/2/70))+'s')});
 }
 let adTimer=null,adIdx=0;
 function applyTheme(st){
   const t=THEMES[st.brand.theme]||THEMES.texas, r=document.documentElement.style;
   r.setProperty('--bg',t.bg);r.setProperty('--bg2',t.bg2);
   r.setProperty('--text',t.text);r.setProperty('--accent',st.brand.accent||t.accent);
-  r.setProperty('--cols',st.view.cols);
+  r.setProperty('--cols',+st.view.cols||5); // 'auto' keeps the fallback; fitGrid sets real tracks
   const vars=t.light?LIGHT_VARS:DARK_VARS;
   Object.entries(vars).forEach(([k,v])=>r.setProperty(k,v));
 }
@@ -776,23 +790,37 @@ function spotlight(g,st,kick){
       </div>
     </div></div>`;
 }
-/* size the grid's tiles as big a square as fits cols x rows in the space we have,
-   then center it — so tile art is always square, never stretched */
+/* size the grid to fill the stage edge to edge. 'auto' columns picks whatever column
+   count gives the biggest, squarest tiles for this screen; a number forces that many
+   across. Tracks stretch to use every pixel, so there's no dead margin left or right. */
+function bestCols(total,availW,availH){
+  let best=4,bestCell=0;
+  for(let c=4;c<=Math.min(14,total);c++){
+    const r=Math.ceil(total/c);
+    const cell=Math.min(availW/c,availH/r);
+    if(cell>bestCell){bestCell=cell;best=c}
+  }
+  return best;
+}
 function fitGrid(cols,total){
   const stage=$('.stage'),grid=$('#bGrid'),rail=$('#bRail');
   if(!stage||!grid)return;
-  const rows=Math.max(1,Math.ceil(total/cols));
   const railW=(rail&&!rail.classList.contains('hidden'))?rail.getBoundingClientRect().width:0;
   const availW=stage.clientWidth-railW,availH=stage.clientHeight;
   if(availW<=0||availH<=0)return;
+  if(cols==='auto')cols=bestCols(total||40,availW,availH);
+  const rows=Math.max(1,Math.ceil((total||40)/cols));
   const GAP=.022,PAD=.05; // matches the .grid gap/padding formulas below, both in units of --cell
+  // typography scales off the smaller side of a tile, so badges never outgrow the art
   const cell=Math.max(20,Math.floor(Math.min(
     availW/(cols+(cols-1)*GAP+PAD),
     availH/(rows+(rows-1)*GAP+PAD)
   )));
+  const chrome=(n,avail)=>Math.max(20,Math.floor((avail-((n-1)*GAP+PAD)*cell)/n));
+  const cw=chrome(cols,availW),ch=chrome(rows,availH);
   grid.style.setProperty('--cell',cell+'px');
-  grid.style.gridTemplateColumns=`repeat(${cols},${cell}px)`;
-  grid.style.gridTemplateRows=`repeat(${rows},${cell}px)`;
+  grid.style.gridTemplateColumns=`repeat(${cols},${cw}px)`;
+  grid.style.gridTemplateRows=`repeat(${rows},${ch}px)`;
 }
 window.addEventListener('resize',()=>{if(lastGridFit)fitGrid(...lastGridFit)});
 let lastGridFit=null;
@@ -845,7 +873,7 @@ function renderBoard(){
       if(!filled(g))dim=dim||mode!=='all';
       return ticketTile(g,i,st,{dim,pick});
     }).join('');
-    lastGridFit=[+st.view.cols||5,list.length];
+    lastGridFit=[st.view.cols==='auto'?'auto':(+st.view.cols||5),list.length];
     fitGrid(...lastGridFit);
   }
 
@@ -962,7 +990,7 @@ function tabBrand(st){
         <button class="btn sm" id="bLogoPick">Upload</button>
         <button class="btn sm" id="bLogoLink">Link</button>
         ${b.logo?'<button class="btn sm danger" id="bLogoDel">×</button>':''}</div></div>
-      <div class="f"><label>Columns on TV</label><select id="bCols">${[4,5,6,7,8,10].map(n=>`<option value="${n}" ${+st.view.cols===n?'selected':''}>${n} across</option>`).join('')}</select></div>
+      <div class="f"><label>Columns on TV</label><select id="bCols"><option value="auto" ${st.view.cols==='auto'?'selected':''}>Auto — fill the screen</option>${[4,5,6,7,8,10].map(n=>`<option value="${n}" ${+st.view.cols===n?'selected':''}>${n} across</option>`).join('')}</select></div>
       <div class="f"><label>Empty slots</label><select id="bEmpty">
         <option value="show" ${st.view.empty==='show'?'selected':''}>Show as blanks</option>
         <option value="hide" ${st.view.empty==='hide'?'selected':''}>Hide</option></select></div>
@@ -1280,7 +1308,7 @@ $('#aBody').addEventListener('input',e=>{
 $('#aBody').addEventListener('change',e=>{
   const st=S(),el=e.target,i=+el.dataset.i;
   if(el.dataset.flag){st.games[i][el.dataset.flag]=el.checked;save();return}
-  if(el.id==='bCols'){st.view.cols=+el.value;save();reRender()}
+  if(el.id==='bCols'){st.view.cols=el.value==='auto'?'auto':+el.value;save();reRender()}
   if(el.id==='bEmpty'){st.view.empty=el.value;save()}
   if(el.id==='bSort'){st.view.sort=el.value;save()}
   if(el.id==='bTile'){st.view.tile=el.value;save();reRender()}
