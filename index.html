@@ -659,19 +659,13 @@ function cardTile(g,i,st,mods={}){
   const c=tierColor(g.price);
   if(!filled(g))return `<div class="tc empty" style="--i:${i}"><div class="tcArt">
       <div class="slotB">${String(g.slot).padStart(2,'0')}</div><div class="noart">open slot</div></div></div>`;
-  const s=statusOf(g,st.view.endingAt);
   return `<div class="tc ${mods.dim?'dim':''} ${mods.pick?'pick':''}" style="--i:${i};--c:${c}">
     <div class="tcArt">
       <div class="slotB">${String(g.slot).padStart(2,'0')}</div>
       ${g.img?`${imgTag(g)}<div class="pxy" style="display:none"><b>${g.price!==''?'$'+esc(g.price):'—'}</b><s>${g.no?'#'+esc(g.no):''}</s></div>`
              :`<div class="pxy"><b>${g.price!==''?'$'+esc(g.price):'—'}</b><s>${g.no?'#'+esc(g.no):'no picture'}</s></div>`}
       ${g.closing?`<div class="ribbon"><i>CLOSING SOON</i></div>`:''}
-    </div>
-    <div class="tcFoot">
-      <div class="st ${s.low?'low':''}">${esc(s.txt)}</div>
-      ${g.current!==''?`<div class="cur"><b>Current</b><s>${String(g.current).padStart(2,'0')}</s></div>`:''}
-    </div>
-    <div class="tcBar"></div></div>`;
+    </div></div>`;
 }
 function ticketTile(g,i,st,mods={}){
   if((st.view.tile||'card')==='card')return cardTile(g,i,st,mods);
