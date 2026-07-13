@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: lottery-display
+    runtime: python
+    plan: free
+    buildCommand: "true"
+    startCommand: "python3 server.py"
+    envVars:
+      - key: PIN
+        value: "0987"

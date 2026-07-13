@@ -1,0 +1,1388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lottery Display</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --t1:#4FA3D1;--t2:#6BBF59;--t3:#E0913A;--t5:#D9534F;--t10:#8E6FCF;
+  --t20:#E8C46A;--t30:#2FB6A8;--t50:#E05C9E;--t100:#C6CDDA;--tx:#7A8497;
+  --display:'Archivo Black',Impact,'Arial Black',sans-serif;
+  --body:'Archivo',system-ui,-apple-system,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+  --cols:5;--cell:calc(100vw / var(--cols));
+  /* themed at runtime */
+  --bg:#12141C;--bg2:#1B2030;--panel:#1F2431;--panel2:#262C3B;
+  --line:#2E3547;--line2:#3B4459;--text:#F2F1EC;--mute:#8E97AA;--mute2:#5C6579;--accent:#E8C46A;
+  /* board surfaces — swapped for light themes */
+  --tile:rgba(255,255,255,.055);--tileBd:rgba(255,255,255,.12);--barBg:rgba(0,0,0,.35);
+  --railBg:rgba(0,0,0,.35);--chipBg:#fff;--chipInk:#14161C;--slotBg:#fff;--slotInk:#14161C;
+  --footBg:#fff;--footInk:#14161C;--scrim:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,.72));
+  --shadow:none;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font-family:var(--body);overflow:hidden}
+button{font-family:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.hidden{display:none!important}
+
+/* ============ TV BOARD ============ */
+#board{position:relative;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+#bgLayer{position:absolute;inset:0;z-index:0;overflow:hidden;background:linear-gradient(160deg,var(--bg),var(--bg2))}
+#bgLayer img,#bgLayer video{width:100%;height:100%;object-fit:cover;display:block}
+#bgScrim{position:absolute;inset:0;background:var(--scrim);z-index:1}
+#board>*{position:relative;z-index:2}
+
+.bar{display:flex;align-items:center;gap:calc(var(--cell)*.05);padding:calc(var(--cell)*.035) calc(var(--cell)*.06);
+  border-bottom:2px solid var(--tileBd);background:var(--barBg);flex:0 0 auto;backdrop-filter:blur(4px)}
+.logo{height:calc(var(--cell)*.13);width:auto;max-width:calc(var(--cell)*.5);object-fit:contain;flex:0 0 auto}
+.mark h1{font-family:var(--display);margin:0;line-height:1;font-size:calc(var(--cell)*.088);letter-spacing:-.015em;white-space:nowrap}
+.mark .sub{font-family:var(--mono);font-weight:700;color:var(--accent);font-size:calc(var(--cell)*.034);letter-spacing:.2em;text-transform:uppercase}
+.legend{margin-left:auto;display:flex;gap:calc(var(--cell)*.022)}
+.lg{display:flex;align-items:center;gap:.4em;font-family:var(--mono);font-weight:800;font-size:calc(var(--cell)*.032);
+  padding:.3em .55em;border-radius:999px;background:var(--tile);border:1px solid var(--tileBd)}
+.lg i{width:.6em;height:.6em;border-radius:2px;background:var(--c);display:block}
+
+/* jackpot strip */
+.jp{display:flex;gap:calc(var(--cell)*.02);padding:calc(var(--cell)*.02) calc(var(--cell)*.06);
+  background:var(--barBg);border-bottom:1px solid var(--tileBd);flex:0 0 auto;overflow:hidden}
+.jpi{display:flex;align-items:baseline;gap:.45em;padding:.25em .7em;border-radius:8px;background:var(--tile);border:1px solid var(--tileBd);white-space:nowrap}
+.jpi b{font-family:var(--mono);font-weight:800;font-size:calc(var(--cell)*.03);letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
+.jpi s{text-decoration:none;font-family:var(--display);font-size:calc(var(--cell)*.05);color:var(--accent)}
+.jpi em{font-style:normal;font-family:var(--mono);font-size:calc(var(--cell)*.026);color:var(--mute2)}
+
+.stage{flex:1 1 auto;display:flex;min-height:0}
+.grid{flex:1 1 auto;display:grid;grid-template-columns:repeat(var(--cols),1fr);grid-auto-rows:1fr;
+  gap:calc(var(--cell)*.022);padding:calc(var(--cell)*.025);min-height:0}
+
+/* a ticket tile */
+.tk{position:relative;display:flex;flex-direction:column;border-radius:calc(var(--cell)*.02);overflow:hidden;
+  background:var(--tile);border:1px solid var(--tileBd);box-shadow:var(--shadow);min-height:0}
+.tk.dim{opacity:.22;filter:saturate(.3)}
+.tk.pick{outline:calc(var(--cell)*.012) solid var(--c);outline-offset:-2px;background:var(--tile);filter:brightness(1.06)}
+.tk.empty{background:transparent;border-style:dashed}
+
+.tkArt{flex:1 1 auto;position:relative;display:flex;align-items:center;justify-content:center;min-height:0;padding:calc(var(--cell)*.015)}
+.tkArt img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.tkArt .noart{font-family:var(--mono);font-size:calc(var(--cell)*.03);color:var(--mute2);text-align:center}
+/* price chip, slot no, game no — laid over the art like the real thing */
+.chipL{position:absolute;left:calc(var(--cell)*.02);top:calc(var(--cell)*.02);background:var(--chipBg);color:var(--chipInk);
+  font-family:var(--mono);font-weight:800;font-size:calc(var(--cell)*.032);padding:.2em .45em;border-radius:4px}
+.slotNo{position:absolute;left:50%;top:0;transform:translateX(-50%);background:var(--slotBg);color:var(--slotInk);
+  font-family:var(--mono);font-weight:800;font-size:calc(var(--cell)*.044);padding:.12em .5em;border-radius:0 0 6px 6px;min-width:2.1em;text-align:center}
+.gameNo{position:absolute;right:calc(var(--cell)*.02);top:calc(var(--cell)*.02);background:var(--chipBg);color:var(--chipInk);
+  font-family:var(--mono);font-weight:700;font-size:calc(var(--cell)*.024);padding:.2em .4em;border-radius:4px;line-height:1.15;text-align:right}
+.flag{position:absolute;left:calc(var(--cell)*.02);bottom:calc(var(--cell)*.02);display:flex;gap:3px}
+.flag span{font-family:var(--mono);font-weight:800;font-size:calc(var(--cell)*.022);padding:.2em .4em;border-radius:3px;color:#14161C}
+.f-new{background:#6BBF59}.f-lucky{background:#E8C46A}.f-end{background:#D9534F;color:#fff}
+
+.tkFoot{flex:0 0 auto;background:var(--footBg);color:var(--footInk);border-top:1px solid var(--tileBd);display:flex;align-items:center;justify-content:space-between;
+  gap:.4em;padding:calc(var(--cell)*.022) calc(var(--cell)*.03)}
+.tkFoot .st{font-family:var(--display);font-size:calc(var(--cell)*.036);letter-spacing:-.01em;line-height:1.1}
+.tkFoot .st.low{color:#C0392B}
+.tkFoot .cur{text-align:right;line-height:1.05}
+.tkFoot .cur b{display:block;font-family:var(--body);font-weight:700;font-size:calc(var(--cell)*.02);color:#7A8497}
+.tkFoot .cur s{text-decoration:none;font-family:var(--mono);font-weight:800;font-size:calc(var(--cell)*.036);color:var(--c)}
+.tkBar{flex:0 0 auto;height:calc(var(--cell)*.022);background:var(--c)}
+.tkName{position:absolute;inset:auto 0 0 0;display:none}
+
+/* spotlight (recommended game / ticket on number) */
+.spot{flex:1 1 auto;display:flex;align-items:center;justify-content:center;gap:4vw;padding:2vw 4vw;min-height:0}
+.spot img{max-height:62vh;max-width:34vw;object-fit:contain;border-radius:10px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.spot .info{max-width:44vw}
+.spot .kick{font-family:var(--mono);font-weight:800;letter-spacing:.24em;text-transform:uppercase;color:var(--accent);font-size:1.5vw}
+.spot h2{font-family:var(--display);font-size:5.2vw;line-height:.98;margin:.18em 0;letter-spacing:-.02em;overflow-wrap:anywhere}
+.spot .row{display:flex;gap:1.4vw;align-items:center;margin-top:1.2vw;flex-wrap:wrap}
+.spot .big{font-family:var(--display);font-size:4vw;color:var(--c);line-height:1}
+.spot .pillx{font-family:var(--mono);font-weight:800;font-size:1.5vw;background:var(--tile);
+  border:1px solid var(--tileBd);padding:.35em .7em;border-radius:999px}
+
+/* ad rail + winners ticker */
+.rail{flex:0 0 auto;width:calc(var(--cell)*1.05);border-left:1px solid var(--tileBd);
+  background:var(--railBg);display:flex;flex-direction:column;padding:calc(var(--cell)*.03);gap:calc(var(--cell)*.03)}
+.ad{flex:1 1 auto;display:flex;flex-direction:column;gap:.5em;align-items:center;justify-content:center;text-align:center;
+  border:1px solid var(--tileBd);border-radius:calc(var(--cell)*.02);padding:calc(var(--cell)*.03);overflow:hidden;
+  background:var(--tile);transition:opacity .5s}
+.ad img{max-width:100%;max-height:60%;object-fit:contain;border-radius:6px}
+.ad .txt{font-family:var(--display);font-size:calc(var(--cell)*.05);line-height:1.15;overflow-wrap:anywhere}
+.ad .kick{font-family:var(--mono);font-size:calc(var(--cell)*.024);letter-spacing:.2em;text-transform:uppercase;color:var(--accent)}
+.win{flex:0 0 auto;border-top:1px solid var(--tileBd);padding-top:calc(var(--cell)*.03)}
+.win .kick{font-family:var(--mono);font-size:calc(var(--cell)*.024);letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin-bottom:.5em}
+.win .w{display:flex;justify-content:space-between;gap:.5em;font-size:calc(var(--cell)*.028);padding:.3em 0;border-bottom:1px dashed var(--tileBd)}
+.win .w b{font-family:var(--mono);color:#6BBF59}
+
+/* ---- ticket card (Texas Lottery style: art carries the price + game no) ---- */
+.tc{position:relative;display:flex;flex-direction:column;min-height:0;border-radius:calc(var(--cell)*.035);
+  background:var(--cardBg,#fff);box-shadow:var(--cardSh,0 3px 10px rgba(20,23,31,.13));overflow:hidden;
+  border:1px solid var(--tileBd)}
+.tc.dim{opacity:.2;filter:saturate(.25)}
+.tc.pick{outline:calc(var(--cell)*.012) solid var(--accent);outline-offset:-1px}
+.tc.empty{background:transparent;border:1px dashed var(--tileBd);box-shadow:none}
+.tcArt{flex:1 1 auto;position:relative;min-height:0;display:flex;align-items:center;justify-content:center;
+  padding:calc(var(--cell)*.022);overflow:hidden}
+.tcArt img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.tcArt .noart{font-family:var(--mono);font-size:calc(var(--cell)*.03);color:#9CA3AF;text-align:center;line-height:1.4}
+.tcArt .pxy{font-family:var(--display);color:#111827;text-align:center;line-height:1.05}
+.tcArt .pxy b{display:block;font-size:calc(var(--cell)*.075)}
+.tcArt .pxy s{text-decoration:none;display:block;font-family:var(--mono);font-size:calc(var(--cell)*.03);color:#6B7280}
+/* the slot number — what the customer says out loud */
+.slotB{position:absolute;left:0;top:0;background:var(--accent);color:#fff;
+  font-family:var(--mono);font-weight:800;font-size:calc(var(--cell)*.055);line-height:1;
+  padding:calc(var(--cell)*.016) calc(var(--cell)*.026);border-radius:0 0 calc(var(--cell)*.02) 0;
+  box-shadow:0 2px 6px rgba(0,0,0,.25);z-index:2}
+/* the state's own CLOSING SOON corner ribbon */
+.ribbon{position:absolute;right:0;bottom:0;width:60%;height:60%;overflow:hidden;z-index:2;pointer-events:none}
+.ribbon i{position:absolute;right:-32%;bottom:18%;width:150%;transform:rotate(-45deg);transform-origin:center;
+  background:#E11D2E;color:#fff;text-align:center;font-family:var(--body);font-weight:800;
+  font-size:calc(var(--cell)*.026);letter-spacing:.04em;padding:calc(var(--cell)*.012) 0;
+  box-shadow:0 1px 5px rgba(0,0,0,.3);font-style:normal}
+.tcFoot{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:.4em;
+  padding:calc(var(--cell)*.018) calc(var(--cell)*.028);background:var(--footBg);color:var(--footInk);
+  border-top:1px solid var(--tileBd)}
+.tcFoot .st{font-family:var(--display);font-size:calc(var(--cell)*.034);line-height:1.1;letter-spacing:-.01em}
+.tcFoot .st.low{color:#C0392B}
+.tcFoot .cur{text-align:right;line-height:1.05}
+.tcFoot .cur b{display:block;font-family:var(--body);font-weight:700;font-size:calc(var(--cell)*.019);color:#8A93A3}
+.tcFoot .cur s{text-decoration:none;font-family:var(--mono);font-weight:800;font-size:calc(var(--cell)*.034);color:var(--c)}
+.tcBar{flex:0 0 auto;height:calc(var(--cell)*.018);background:var(--c)}
+.grid.anim .tc{animation:rise .3s cubic-bezier(.2,.7,.3,1) both;animation-delay:calc(var(--i)*12ms)}
+@media (prefers-reduced-motion:reduce){.grid.anim .tc{animation:none}}
+
+@keyframes rise{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+.grid.anim .tk{animation:rise .3s cubic-bezier(.2,.7,.3,1) both;animation-delay:calc(var(--i)*12ms)}
+@media (prefers-reduced-motion:reduce){.grid.anim .tk{animation:none}}
+
+.chrome{position:fixed;right:14px;bottom:14px;display:flex;gap:8px;z-index:30;transition:opacity .4s}
+.chrome.idle{opacity:0;pointer-events:none}
+.cbtn{background:rgba(20,22,30,.9);color:#F2F1EC;border:1px solid rgba(255,255,255,.25);border-radius:8px;
+  padding:9px 13px;font-size:13px;font-weight:600;cursor:pointer}
+
+/* ============ COUNTER-SIDE APP — red & white ============ */
+#counter{height:100vh;overflow:auto;background:#F7F8FA;color:#14171F}
+.cwrap{max-width:560px;margin:0 auto;padding:18px 16px 60px}
+.chead{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.chead h2{font-size:19px;margin:0;font-weight:800;color:#D62828}
+.chead .st{margin-left:auto;font-family:var(--mono);font-size:11px;font-weight:800;color:#fff;
+  background:#D62828;padding:5px 9px;border-radius:999px}
+.csec{background:#fff;border:1px solid #E2E5EA;border-radius:14px;padding:14px;margin-bottom:14px;
+  box-shadow:0 1px 2px rgba(20,23,31,.05)}
+.csec h3{margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:#8A93A1;
+  display:flex;align-items:center;gap:7px}
+.cgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.cgrid.two{grid-template-columns:repeat(2,1fr)}
+.cb{background:#fff;border:1.5px solid #CFD4DC;border-radius:11px;padding:15px 8px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:6px;font-weight:700;font-size:13px;
+  color:#14171F;transition:.12s}
+.cb:hover{border-color:#D62828;color:#D62828;background:#FDECEC}
+.cb.on{background:#D62828;border-color:#D62828;color:#fff}
+.cb .ic{font-size:20px;line-height:1}
+.cb .pz{font-family:var(--mono);font-weight:800;font-size:17px}
+.cnum{display:flex;gap:8px}
+.cnum input{flex:1;padding:12px;border:1.5px solid #CFD4DC;border-radius:11px;font-family:var(--mono);
+  font-weight:800;font-size:16px;text-align:center;background:#fff;color:#14171F}
+.cnum input:focus{border-color:#D62828;outline:none;box-shadow:0 0 0 3px #FDECEC}
+.cbtn2{background:#D62828;color:#fff;border:none;border-radius:11px;padding:12px 18px;font-weight:700;cursor:pointer}
+.cbtn2:hover{background:#A81E1E}
+.cbtn2.ghost{background:#fff;color:#D62828;border:1.5px solid #CFD4DC}
+.cbtn2.ghost:hover{border-color:#D62828;background:#FDECEC}
+
+/* ============ BACKEND — red & white ============ */
+:root{
+  --r:#D62828;        /* the red */
+  --r-dk:#A81E1E;     /* pressed / hover */
+  --r-lt:#FDECEC;     /* red tint for fills */
+  --ink:#14171F;      /* text */
+  --ink-2:#5B6472;    /* secondary text */
+  --ink-3:#8A93A1;    /* labels */
+  --bd:#E2E5EA;       /* hairline */
+  --bd-2:#CFD4DC;     /* input border */
+  --sf:#FFFFFF;       /* panels */
+  --sf-2:#F7F8FA;     /* page + table head */
+}
+#admin{height:100vh;overflow:auto;background:var(--sf-2);color:var(--ink)}
+.awrap{max-width:1240px;margin:0 auto;padding:22px 20px 90px}
+.ahead{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.ahead h2{font-family:var(--display);font-size:27px;margin:0 0 3px;color:var(--r)}
+.ahead p{margin:0;color:var(--ink-2);font-size:13.5px}
+.sp{flex:1}
+.tabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:16px;border-bottom:2px solid var(--bd);padding-bottom:10px}
+.tab{background:transparent;color:var(--ink-2);border:1px solid transparent;border-radius:9px;padding:8px 13px;
+  font-size:13.5px;font-weight:700;cursor:pointer}
+.tab:hover{color:var(--r);background:var(--r-lt)}
+.tab.on{background:var(--r);color:#fff}
+.btn{background:#fff;color:var(--ink);border:1.5px solid var(--bd-2);border-radius:9px;padding:9px 14px;
+  font-size:13.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--r);color:var(--r)}
+.btn.go{background:var(--r);color:#fff;border-color:var(--r)}
+.btn.go:hover{background:var(--r-dk);border-color:var(--r-dk);color:#fff}
+.btn.sm{padding:6px 10px;font-size:12px;border-radius:7px}
+.btn.danger{color:var(--r);border-color:#F0B9B9;background:var(--r-lt)}
+.btn.danger:hover{background:var(--r);color:#fff;border-color:var(--r)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.panel{background:var(--sf);border:1px solid var(--bd);border-radius:14px;margin-bottom:16px;overflow:hidden;
+  box-shadow:0 1px 2px rgba(20,23,31,.05)}
+.ph{display:flex;align-items:center;gap:11px;padding:12px 16px;border-bottom:1px solid var(--bd);
+  background:var(--sf-2);flex-wrap:wrap}
+.ph h3{margin:0;font-size:14.5px;font-weight:700}
+.ph .hint{color:var(--ink-2);font-size:12.5px}
+.pb{padding:15px 16px}
+.fields{display:flex;gap:13px;flex-wrap:wrap;align-items:flex-end}
+.f{display:flex;flex-direction:column;gap:5px}
+.f label{font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-3);font-weight:700}
+.f input,.f select,.f textarea{background:#fff;color:var(--ink);border:1.5px solid var(--bd-2);border-radius:8px;
+  padding:9px 11px;font-family:var(--body);font-size:14px}
+.f input:focus,.f select:focus,.f textarea:focus{border-color:var(--r);outline:none;box-shadow:0 0 0 3px var(--r-lt)}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;
+  color:var(--ink-3);font-weight:700;padding:10px;border-bottom:2px solid var(--bd);background:var(--sf-2)}
+td{padding:8px 10px;border-bottom:1px solid var(--bd);vertical-align:middle}
+tr:hover td{background:var(--r-lt)}
+.rno{font-family:var(--mono);font-weight:800;color:var(--ink-3);font-size:12px}
+.in{width:100%;background:#fff;color:var(--ink);border:1.5px solid var(--bd-2);border-radius:7px;
+  padding:7px 9px;font-size:13.5px}
+.in.mono{font-family:var(--mono);font-weight:700;text-align:center}
+.in:focus{border-color:var(--r);outline:none;box-shadow:0 0 0 3px var(--r-lt)}
+.thumb{width:40px;height:54px;border-radius:5px;background:var(--sf-2);border:1px solid var(--bd);display:flex;
+  align-items:center;justify-content:center;overflow:hidden;flex:0 0 auto}
+.thumb img{width:100%;height:100%;object-fit:contain}
+.thumb.none{border-style:dashed;color:var(--ink-3);font-size:8.5px;font-family:var(--mono);text-align:center}
+.imgcell{display:flex;align-items:center;gap:8px}
+.chk{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-2);white-space:nowrap}
+.chk input{accent-color:var(--r)}
+.note{display:flex;gap:10px;background:var(--r-lt);border:1px solid #F3C9C9;border-left:4px solid var(--r);
+  border-radius:10px;padding:11px 14px;font-size:13px;color:#6B4A4A;line-height:1.5}
+.note b{color:var(--ink)}
+.note code{background:#fff;padding:1px 5px;border-radius:4px;border:1px solid #F0C4C4}
+.swatch{display:flex;gap:7px;flex-wrap:wrap}
+.sw{width:34px;height:34px;border-radius:8px;border:2px solid var(--bd);cursor:pointer}
+.sw.on{border-color:var(--ink);box-shadow:0 0 0 2px #fff inset}
+.themes{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.th{border:1.5px solid var(--bd-2);border-radius:11px;padding:11px;cursor:pointer;text-align:left;background:#fff}
+.th:hover{border-color:var(--r)}
+.th.on{border-color:var(--r);background:var(--r-lt)}
+.th .bars{display:flex;gap:3px;margin-bottom:8px}
+.th .bars i{height:22px;flex:1;border-radius:3px}
+.th b{font-size:13px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+.stat{background:var(--sf);border:1px solid var(--bd);border-left:4px solid var(--r);border-radius:11px;padding:13px}
+.stat .k{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3);font-weight:700}
+.stat .v{font-family:var(--mono);font-weight:800;font-size:23px;margin-top:5px}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(14px);background:var(--r);color:#fff;
+  font-weight:700;font-size:13.5px;padding:11px 18px;border-radius:10px;opacity:0;pointer-events:none;
+  transition:.22s;z-index:99;box-shadow:0 6px 20px rgba(214,40,40,.35)}
+#toast.on{opacity:1;transform:translateX(-50%)}
+@media(max-width:820px){.legend{display:none}.rail{display:none}}
+</style>
+</head>
+<body>
+
+<!-- ============ TV BOARD ============ -->
+<div id="board">
+  <div id="bgLayer"></div><div id="bgScrim"></div>
+  <div class="bar">
+    <img id="bLogo" class="logo hidden" alt="">
+    <div class="mark"><h1 id="bTitle">Store</h1><div class="sub" id="bSub"></div></div>
+    <div class="legend" id="bLegend"></div>
+  </div>
+  <div class="jp hidden" id="bJp"></div>
+  <div class="stage">
+    <div class="grid anim" id="bGrid"></div>
+    <div class="rail hidden" id="bRail"></div>
+  </div>
+</div>
+<div class="chrome" id="chrome">
+  <span class="cbtn" id="link" style="cursor:default">● …</span>
+  <button class="cbtn" id="goFull">Full screen</button>
+  <button class="cbtn" id="goCounter">Counter app</button>
+  <button class="cbtn" id="goAdmin">Backend</button>
+</div>
+
+<!-- ============ COUNTER-SIDE APP ============ -->
+<div id="counter" class="hidden">
+  <div class="cwrap">
+    <div class="chead">
+      <h2>Show tickets on screen</h2>
+      <span class="st" id="cStatus">SHOWING ALL</span>
+    </div>
+
+    <div class="csec">
+      <h3>By price</h3>
+      <div class="cgrid" id="cPrices"></div>
+    </div>
+
+    <div class="csec">
+      <h3>Quick views</h3>
+      <div class="cgrid two">
+        <button class="cb" data-mode="new"><span class="ic">🆕</span>New tickets</button>
+        <button class="cb" data-mode="lucky"><span class="ic">🍀</span>Lucky tickets</button>
+        <button class="cb" data-mode="ending"><span class="ic">⌛</span>Ending tickets</button>
+        <button class="cb" data-mode="recommended"><span class="ic">⭐</span>Recommended game</button>
+        <button class="cb" data-mode="slots"><span class="ic">🎯</span>Recommended slots</button>
+        <button class="cb" data-mode="all"><span class="ic">▦</span>Show all 40</button>
+      </div>
+    </div>
+
+    <div class="csec">
+      <h3>Ticket on number</h3>
+      <div class="cnum">
+        <input id="cNum" inputmode="numeric" placeholder="Slot no." maxlength="4">
+        <button class="cbtn2" id="cNumGo">Show</button>
+        <button class="cbtn2 ghost" id="cBack">Back to all</button>
+      </div>
+    </div>
+
+    <div class="csec">
+      <h3>Log a sale</h3>
+      <div class="cgrid" id="cSell"></div>
+      <div style="margin-top:10px;font-size:12.5px;color:var(--ink-3)">Tap a price to record one ticket sold today. Totals show in the backend under Sales.</div>
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button class="cbtn2 ghost" id="cToBoard">Open TV board</button>
+      <button class="cbtn2 ghost" id="cToAdmin">Backend</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ BACKEND ============ -->
+<div id="admin" class="hidden">
+  <div class="awrap">
+    <div class="ahead">
+      <div><h2 id="aStoreName">Backend</h2><p>Everything on the TV is set here. Saves push to the board instantly.</p></div>
+      <div class="sp"></div>
+      <span id="link" class="rno" style="padding:9px 4px">● …</span>
+      <select id="aStore" class="in" style="width:auto;padding:9px 11px"></select>
+      <button class="btn" id="aExport">Back up</button>
+      <button class="btn" id="aImportBtn">Restore</button>
+      <input type="file" id="aImport" accept="application/json" class="hidden">
+      <button class="btn go" id="aBoard">Open TV board</button>
+    </div>
+    <div class="tabs" id="aTabs"></div>
+    <div id="aBody"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ---------------- storage ----------------
+   Two modes:
+   · SERVED  — running under server.py. The board lives on the server, so the TV, the
+               counter phone and the backend all see the same thing. Changes made
+               anywhere show up everywhere within ~1.5s.
+   · SOLO    — opened as a plain file. Falls back to this browser's own storage
+               (fine for one machine; other devices won't see it).                     */
+const KEY='lotterydisplay.v1';
+const PIN='0987';
+const pinOK=()=>localStorage.getItem('ld.pin')===PIN;
+function askPin(){
+  const v=prompt('Enter PIN to continue');
+  if(v===PIN){localStorage.setItem('ld.pin',PIN);return true}
+  if(v!==null)toast('Wrong PIN');
+  return false;
+}
+let mem=null, SERVED=false, rev=0, pushT=null, pulling=false;
+const local={
+  get(){try{const r=localStorage.getItem(KEY);return r?JSON.parse(r):null}catch(e){return mem}},
+  set(v){try{localStorage.setItem(KEY,JSON.stringify(v))}catch(e){mem=v;
+    if(/quota|exceed/i.test(String(e)))toast('Storage full — use smaller pictures, or link them instead')}}
+};
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let tt;const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),1900)};
+
+/* push to the server, debounced — a burst of edits becomes one write */
+function push(){
+  if(!SERVED)return;
+  clearTimeout(pushT);
+  pushT=setTimeout(async()=>{
+    try{
+      const r=await fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json','X-Pin':PIN},
+        body:JSON.stringify({state:db})});
+      const j=await r.json();
+      if(j.rev)rev=j.rev;           // remember our own write so we don't re-pull it
+      setLink(true);
+    }catch(e){setLink(false)}
+  },220);
+}
+/* has anyone else changed the board? */
+async function pull(){
+  if(!SERVED||pulling)return;
+  try{
+    const r=await fetch('/api/rev',{cache:'no-store'});
+    const j=await r.json();
+    if(j.rev===rev){setLink(true);return}
+    // don't yank a field out from under someone who's typing in the backend
+    const typing=document.activeElement&&/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
+    if(typing&&location.hash==='#admin')return;
+    pulling=true;
+    const r2=await fetch('/api/state',{cache:'no-store'});
+    const j2=await r2.json();
+    if(j2.state){db=j2.state;rev=j2.rev;local.set(db);route()}
+    setLink(true);
+  }catch(e){setLink(false)}
+  finally{pulling=false}
+}
+function setLink(ok){
+  const txt=SERVED?(ok?'● live':'● offline'):'● this device only';
+  const col=SERVED?(ok?'#6BBF59':'#E05C5C'):'#8E97AA';
+  $$('#link,[id="link"]').forEach(el=>{el.textContent=txt;el.style.color=col;});
+}
+const save=()=>{local.set(db);push();};
+
+/* ---------------- model ---------------- */
+/* Texas Lottery scratch-off catalog — pulled from texaslottery.com Games by Price Point, 13 Jul 2026.
+   Ticket art is hotlinked from the state site, so it costs no storage. */
+let TX=[
+{no:"2747",name:"Ms. PAC-MAN",price:5,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2747_200X200.gif",feat:false,isNew:true,closing:false,endDate:null,prizesLeft:null},
+{no:"2753",name:"$1,000,000 Crossword",price:20,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2753_200X200.gif",feat:false,isNew:true,closing:false,endDate:null,prizesLeft:null},
+{no:"2710",name:"9s In A Line",price:1,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2710_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2739",name:"King of Cash",price:2,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2739_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2715",name:"Find $200",price:2,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2715_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2646",name:"20X The Money",price:2,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2646_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2672",name:"Royal Riches",price:2,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2672_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2622",name:"Lucky No. 7",price:2,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2622_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2656",name:"Crazy 8s",price:2,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2656_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2692",name:"Patriotic Payout",price:2,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2692_200X200.gif",feat:false,isNew:false,closing:true,endDate:"08/12/2026",prizesLeft:null},
+{no:"2686",name:"$30,000 Gold Rush",price:2,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2686_200X200.gif",feat:false,isNew:false,closing:true,endDate:"07/15/2026",prizesLeft:null},
+{no:"2700",name:"Break the Bank",price:2,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2700_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2647",name:"Cash Line Bingo",price:2,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2647_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2662",name:"Cashword",price:3,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2662_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2711",name:"30X The Cash Word Search",price:3,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2711_200X200.gif",feat:true,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2628",name:"Texas Loteria",price:3,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2628_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2504",name:"Crossword",price:3,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2504_200X200.gif",feat:false,isNew:false,closing:true,endDate:"07/15/2026",prizesLeft:null},
+{no:"2743",name:"Super Loteria",price:5,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2743_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2745",name:"Airstream Dream",price:5,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2745_200X200.gif",feat:true,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2740",name:"Super Crossword",price:5,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2740_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2727",name:"All About the 8s",price:5,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2727_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2765",name:"Loteria Azul",price:5,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2765_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2736",name:"Monaco Cash",price:5,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2736_200X200.gif",feat:true,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2577",name:"$100,000 Cash",price:5,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2577_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2728",name:"Yellowstone",price:5,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2728_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2723",name:"Lucky 7s Tripler",price:5,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2723_200X200.gif",feat:false,isNew:false,closing:true,endDate:"08/07/2026",prizesLeft:0},
+{no:"2660",name:"In the Green",price:5,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2660_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2720",name:"Chameleon Cash",price:5,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2720_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2751",name:"Azulejos",price:5,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2751_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2712",name:"50X The Cash",price:5,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2712_200X200.gif",feat:true,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2667",name:"Bingo Times 20",price:5,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2667_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2683",name:"Emerald 7s",price:5,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2683_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2430",name:"Bonus Break the Bank",price:5,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2430_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2648",name:"Super Loteria",price:5,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2648_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2733",name:"Mega Cash!",price:10,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2733_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2737",name:"Monaco VIP",price:10,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2737_200X200.gif",feat:true,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2724",name:"Slots of Luck",price:10,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2724_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2632",name:"777",price:10,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2632_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2636",name:"$1,000,000 Riches",price:10,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2636_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2713",name:"100X The Cash",price:10,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2713_200X200.gif",feat:true,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2705",name:"Lucky Match",price:10,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2705_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2699",name:"Reindeer Riches",price:10,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2699_200X200.gif",feat:false,isNew:false,closing:true,endDate:"08/12/2026",prizesLeft:null},
+{no:"2691",name:"100X Sonic Blast",price:10,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2691_200X200.gif",feat:false,isNew:false,closing:true,endDate:"08/12/2026",prizesLeft:null},
+{no:"2668",name:"$250,000 50X Cashword",price:10,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2668_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2669",name:"Mega Loteria",price:10,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2669_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2637",name:"$50, $100 OR $500!",price:10,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2637_200X200.gif",feat:false,isNew:false,closing:true,endDate:"09/02/2026",prizesLeft:null},
+{no:"2676",name:"Limited Edition Mega Loteria",price:10,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2676_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2613",name:"200X The Cash",price:20,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2613_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2706",name:"Queen of Spades",price:20,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2706_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2738",name:"Monaco Millionaire",price:20,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2738_200X200.gif",feat:true,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2725",name:"Power 20s",price:20,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2725_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2722",name:"Mega Millionaire",price:20,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2722_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2714",name:"200X The Cash",price:20,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2714_200X200.gif",feat:true,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2744",name:"$1,000,000 Ca$h!",price:20,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2744_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2671",name:"Instant Millions",price:20,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2671_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2685",name:"Diamond 7s",price:20,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2685_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2655",name:"Extreme Multiplier",price:20,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2655_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2653",name:"Million Dollar Loteria",price:20,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2653_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2658",name:"$1,000,000 Crossword",price:20,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2658_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2609",name:"$100, $200, $500 OR $1,000!",price:20,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2609_200X200.gif",feat:false,isNew:false,closing:true,endDate:"09/02/2026",prizesLeft:null},
+{no:"2730",name:"Millionaire's Club",price:30,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2730_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2661",name:"Premier Play",price:30,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2661_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2633",name:"$3 Million Ca$h",price:30,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2633_200X200.gif",feat:true,isNew:false,closing:true,endDate:"07/15/2026",prizesLeft:null},
+{no:"2610",name:"Ultimate Millions",price:50,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2610_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2689",name:"Casino Millions",price:50,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2689_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2677",name:"Golden Riches",price:50,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2677_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2659",name:"500X Loteria Spectacular",price:50,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2659_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2624",name:"$5 Million Royale",price:50,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2624_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2590",name:"X",price:50,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2590_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2589",name:"500X",price:50,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2589_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2627",name:"$5 Million Titanium Black",price:100,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2627_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2587",name:"Loteria Supreme",price:100,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2587_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2665",name:"$5,000,000 Fortune",price:100,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2665_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null},
+{no:"2400",name:"$20 Million Supreme",price:100,img:"https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2400_200X200.gif",feat:false,isNew:false,closing:false,endDate:null,prizesLeft:null}
+];
+
+const PRICES=[1,2,3,5,10,20,30,50,100];
+const TIER={1:'--t1',2:'--t2',3:'--t3',5:'--t5',10:'--t10',20:'--t20',30:'--t30',50:'--t50',100:'--t100'};
+const tierColor=p=>`var(${TIER[+p]||'--tx'})`;
+/* Ticket art. A Texas Lottery picture is served from our own machine (/art/2747.gif) —
+   the state's site can refuse hotlinked images, and this way the TV needs no internet.
+   Anything you uploaded yourself is left exactly as it is. */
+const TXART=/texaslottery\.com.*?scratchoffs\/(\d{3,5})_/i;
+function imgSrc(u){
+  u=String(u||'');
+  if(!u)return '';
+  if(u.startsWith('data:'))return u;            // you uploaded it — already local
+  if(!SERVED)return u;                          // no server, nothing we can do
+  const m=u.match(TXART);
+  if(m)return `/art/${m[1]}.gif`;               // Texas Lottery ticket art
+  if(/^https?:\/\//i.test(u))return `/api/img?u=${encodeURIComponent(u)}`;  // any other link
+  return u;
+}
+/* if the local copy misses, fall back to the state's URL; if that fails too, show the price */
+function imgTag(g,cls=''){
+  const src=imgSrc(g.img);
+  const back=esc(g.img||'');
+  return `<img ${cls?`class="${cls}" `:''}src="${esc(src)}" alt="" loading="lazy"
+    onerror="if(!this.dataset.t){this.dataset.t=1;this.src='${back}';}else{this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='';}">`;
+}
+const svgSync=()=>'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>';
+const THEMES={
+  texas:{name:'White & Red',bg:'#FFFFFF',bg2:'#F3F5F8',text:'#14171F',accent:'#D62828',light:true},
+  redwhite:{name:'Red & White',bg:'#C1121F',bg2:'#8E0C17',text:'#FFFFFF',accent:'#FFFFFF'},
+  midnight:{name:'Midnight Rack',bg:'#12141C',bg2:'#1B2030',text:'#F2F1EC',accent:'#E8C46A'},
+  carnival:{name:'Neon Carnival',bg:'#2A0B4E',bg2:'#7A1156',text:'#FFF6FF',accent:'#FF3D9A'},
+  bluechip:{name:'Blue Chip',bg:'#071A38',bg2:'#0E3E6B',text:'#EAF3FF',accent:'#4FC3F7'},
+  feltgreen:{name:'Table Felt',bg:'#0B2A1E',bg2:'#124434',text:'#EFF7F1',accent:'#F2C94C'},
+  crimson:{name:'Crimson Rush',bg:'#2A0A0F',bg2:'#5E1220',text:'#FFF0F0',accent:'#FFC46B'}
+};
+const ACCENTS=['#D62828','#C1121F','#E8C46A','#FF3D9A','#4FC3F7','#6BBF59','#8E6FCF','#14171F','#FFFFFF'];
+/* light themes need the opposite surfaces or the tiles vanish into the background */
+const LIGHT_VARS={'--tile':'#FFFFFF','--tileBd':'#E2E5EC','--barBg':'#FFFFFF','--railBg':'#FAFBFC',
+  '--chipBg':'#14171F','--chipInk':'#FFFFFF','--slotBg':'var(--accent)','--slotInk':'#FFFFFF',
+  '--footBg':'#FFFFFF','--footInk':'#14171F','--mute':'#6B7280','--mute2':'#9CA3AF',
+  '--scrim':'linear-gradient(180deg,rgba(255,255,255,.72),rgba(255,255,255,.86))',
+  '--shadow':'0 1px 3px rgba(20,23,31,.10)'};
+const DARK_VARS={'--tile':'rgba(255,255,255,.055)','--tileBd':'rgba(255,255,255,.12)','--barBg':'rgba(0,0,0,.35)',
+  '--railBg':'rgba(0,0,0,.35)','--chipBg':'#fff','--chipInk':'#14161C','--slotBg':'#fff','--slotInk':'#14161C',
+  '--footBg':'#fff','--footInk':'#14161C','--mute':'#8E97AA','--mute2':'#5C6579',
+  '--scrim':'linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,.72))','--shadow':'none'};
+
+const blankGames=()=>Array.from({length:40},(_,i)=>({
+  slot:i+1,no:'',name:'',price:'',img:'',
+  prizesLeft:'',   // top prizes remaining -> "ONLY N LEFT"
+  current:'',      // current ticket in the pack -> "Current NN"
+  isNew:false,isLucky:false,
+  closing:false,endDate:''   // state has called the game -> red CLOSING SOON ribbon
+}));
+const newStore=(name)=>({
+  id:'s'+Math.random().toString(36).slice(2,8),name,
+  brand:{title:name,sub:'Scratch-Offs',logo:'',theme:'texas',accent:'#D62828',
+         bgType:'theme',bgImage:'',bgVideo:''},
+  view:{cols:5,empty:'show',sort:'slot',endingAt:3,tile:'card',showJp:true,showAds:true,showWinners:true,adSecs:8},
+  games:blankGames(),ads:[],jackpots:[],winners:[],sales:{},managers:[],feedUrl:''
+});
+const fresh=()=>{const s=newStore('Swing by Maypearl');return{stores:[s],active:s.id,
+  cmd:{mode:'all',value:'',at:0,holdSecs:30}}};
+
+let db=(()=>{const s=local.get();return (s&&s.stores&&s.stores.length)?s:fresh()})();
+const S=()=>db.stores.find(s=>s.id===db.active)||db.stores[0];
+
+/* ---------------- derived ---------------- */
+const filled=g=>!!(g.name||g.img||g.no);
+/* a game is "ending" if the state called it, or its top prizes are down to the threshold */
+const isEnding=(g,at)=>!!g.closing||(g.prizesLeft!==''&&g.prizesLeft!=null&&+g.prizesLeft<=+at);
+function statusOf(g,at){
+  const pl=(g.prizesLeft!==''&&g.prizesLeft!=null)?+g.prizesLeft:null;
+  if(pl===0)return{txt:'LAST CHANCE',low:true};
+  if(pl!=null&&pl<=+at)return{txt:`ONLY ${pl} LEFT`,low:true};
+  if(g.closing)return{txt:'CLOSING SOON',low:true};
+  return{txt:'GOOD LUCK',low:false};
+}
+/* recommended = best top-prizes-left per dollar, among filled games with data */
+function recommended(games){
+  const c=games.filter(g=>filled(g)&&+g.price>0&&+g.prizesLeft>0);
+  if(!c.length)return null;
+  return c.slice().sort((a,b)=>(+b.prizesLeft/+b.price)-(+a.prizesLeft/+a.price))[0];
+}
+function recSlots(games,at){ // healthy stock + prizes still out there
+  return games.filter(g=>filled(g)&&+g.prizesLeft>+at).slice(0,10).map(g=>g.slot);
+}
+function shownGames(st){
+  let g=st.games.filter(x=>st.view.empty==='hide'?filled(x):true);
+  if(st.view.sort==='num')g=[...g].sort((a,b)=>(+a.no||9e9)-(+b.no||9e9));
+  if(st.view.sort==='price')g=[...g].sort((a,b)=>(+a.price||9e9)-(+b.price||9e9)||(+a.slot)-(+b.slot));
+  return g;
+}
+
+/* ---------------- pictures ---------------- */
+function shrink(file,MAX=380){
+  return new Promise((res,rej)=>{
+    const fr=new FileReader();
+    fr.onerror=()=>rej(new Error('Could not read that file'));
+    fr.onload=()=>{const im=new Image();
+      im.onerror=()=>rej(new Error('That file is not an image'));
+      im.onload=()=>{const s=Math.min(1,MAX/Math.max(im.width,im.height));
+        const c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);
+        c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+        res(c.toDataURL('image/jpeg',0.78));};
+      im.src=fr.result;};
+    fr.readAsDataURL(file);});
+}
+/* one prompt for every "Link" button. An uploaded picture has no URL to show, so the box
+   starts empty; leaving it empty clears the picture. Returns null if you hit Cancel. */
+function askLink(current,label='Link to the picture (paste an image URL):'){
+  const cur=(current||'').startsWith('data:')?'':(current||'');
+  const u=prompt(label,cur);
+  if(u===null)return null;
+  return u.trim();
+}
+const picker=document.createElement('input');picker.type='file';picker.accept='image/*';
+const pickImage=(max=380)=>new Promise(res=>{
+  picker.value='';
+  picker.onchange=async()=>{const f=picker.files[0];if(!f)return res(null);
+    try{res(await shrink(f,max))}catch(e){toast(e.message);res(null)}};
+  picker.click();
+});
+
+/* ---------------- THE BOARD ---------------- */
+let adTimer=null,adIdx=0;
+function applyTheme(st){
+  const t=THEMES[st.brand.theme]||THEMES.texas, r=document.documentElement.style;
+  r.setProperty('--bg',t.bg);r.setProperty('--bg2',t.bg2);
+  r.setProperty('--text',t.text);r.setProperty('--accent',st.brand.accent||t.accent);
+  r.setProperty('--cols',st.view.cols);
+  const vars=t.light?LIGHT_VARS:DARK_VARS;
+  Object.entries(vars).forEach(([k,v])=>r.setProperty(k,v));
+}
+function renderBg(st){
+  const L=$('#bgLayer'),b=st.brand;
+  if(b.bgType==='image'&&b.bgImage)L.innerHTML=`<img src="${esc(imgSrc(b.bgImage))}" alt="">`;
+  else if(b.bgType==='video'&&b.bgVideo)L.innerHTML=`<video src="${esc(b.bgVideo)}" autoplay muted loop playsinline></video>`;
+  else L.innerHTML='';
+  $('#bgScrim').style.opacity=(b.bgType==='image'||b.bgType==='video')?'1':'0';
+}
+function cardTile(g,i,st,mods={}){
+  const c=tierColor(g.price);
+  if(!filled(g))return `<div class="tc empty" style="--i:${i}"><div class="tcArt">
+      <div class="slotB">${String(g.slot).padStart(2,'0')}</div><div class="noart">open slot</div></div></div>`;
+  const s=statusOf(g,st.view.endingAt);
+  return `<div class="tc ${mods.dim?'dim':''} ${mods.pick?'pick':''}" style="--i:${i};--c:${c}">
+    <div class="tcArt">
+      <div class="slotB">${String(g.slot).padStart(2,'0')}</div>
+      ${g.img?`${imgTag(g)}<div class="pxy" style="display:none"><b>${g.price!==''?'$'+esc(g.price):'—'}</b><s>${g.no?'#'+esc(g.no):''}</s></div>`
+             :`<div class="pxy"><b>${g.price!==''?'$'+esc(g.price):'—'}</b><s>${g.no?'#'+esc(g.no):'no picture'}</s></div>`}
+      ${g.closing?`<div class="ribbon"><i>CLOSING SOON</i></div>`:''}
+    </div>
+    <div class="tcFoot">
+      <div class="st ${s.low?'low':''}">${esc(s.txt)}</div>
+      ${g.current!==''?`<div class="cur"><b>Current</b><s>${String(g.current).padStart(2,'0')}</s></div>`:''}
+    </div>
+    <div class="tcBar"></div></div>`;
+}
+function ticketTile(g,i,st,mods={}){
+  if((st.view.tile||'card')==='card')return cardTile(g,i,st,mods);
+  return rackTile(g,i,st,mods);
+}
+function rackTile(g,i,st,mods={}){
+  const c=tierColor(g.price);
+  if(!filled(g))return `<div class="tk empty" style="--i:${i}"><div class="tkArt">
+      <div class="slotNo">${esc(g.slot)}</div><div class="noart">open slot</div></div></div>`;
+  const s=statusOf(g,st.view.endingAt);
+  const flags=[g.isNew?'<span class="f-new">NEW</span>':'',g.isLucky?'<span class="f-lucky">LUCKY</span>':'',
+               isEnding(g,st.view.endingAt)?'<span class="f-end">ENDING</span>':''].join('');
+  return `<div class="tk ${mods.dim?'dim':''} ${mods.pick?'pick':''}" style="--i:${i};--c:${c}">
+    <div class="tkArt">
+      ${g.price!==''?`<div class="chipL">$${esc(g.price)}</div>`:''}
+      <div class="slotNo">${String(g.slot).padStart(2,'0')}</div>
+      ${g.no?`<div class="gameNo">GAME<br>#${esc(g.no)}</div>`:''}
+      ${g.img?imgTag(g):`<div class="noart">no picture</div>`}
+      ${flags?`<div class="flag">${flags}</div>`:''}
+    </div>
+    <div class="tkFoot">
+      <div class="st ${s.low?'low':''}">${esc(s.txt)}</div>
+      ${g.current!==''?`<div class="cur"><b>Current</b><s>${String(g.current).padStart(2,'0')}</s></div>`:''}
+    </div>
+    <div class="tkBar"></div></div>`;
+}
+function spotlight(g,st,kick){
+  const c=tierColor(g.price),s=statusOf(g,st.view.endingAt);
+  return `<div class="spot" style="--c:${c}">
+    ${g.img?imgTag(g):''}
+    <div class="info">
+      <div class="kick">${esc(kick)}</div>
+      <h2>${esc(g.name||'Game')}</h2>
+      <div class="row">
+        <div class="big">$${esc(g.price||'—')}</div>
+        <div class="pillx">SLOT ${String(g.slot).padStart(2,'0')}</div>
+        ${g.no?`<div class="pillx">GAME #${esc(g.no)}</div>`:''}
+      </div>
+      <div class="row">
+        <div class="pillx" style="background:${s.low?'#D9534F':'rgba(255,255,255,.1)'}">${esc(s.txt)}</div>
+        ${g.current!==''?`<div class="pillx">CURRENT ${esc(g.current)}</div>`:''}
+      </div>
+    </div></div>`;
+}
+function renderBoard(){
+  const st=S(),cmd=db.cmd||{mode:'all'};
+  applyTheme(st);renderBg(st);
+  $('#bTitle').textContent=st.brand.title||st.name;
+  $('#bSub').textContent=st.brand.sub||'';
+  const lg=$('#bLogo');
+  if(st.brand.logo){lg.src=imgSrc(st.brand.logo);lg.classList.remove('hidden')}else lg.classList.add('hidden');
+
+  const used=[...new Set(st.games.filter(filled).map(g=>+g.price).filter(Boolean))].sort((a,b)=>a-b);
+  $('#bLegend').innerHTML=used.map(p=>`<span class="lg" style="--c:${tierColor(p)}"><i></i>$${p}</span>`).join('');
+
+  // jackpots
+  const jp=$('#bJp');
+  if(st.view.showJp&&st.jackpots.length){jp.classList.remove('hidden');
+    jp.innerHTML=st.jackpots.map(j=>`<div class="jpi"><b>${esc(j.game)}</b><s>${esc(j.amount)}</s>${j.draw?`<em>${esc(j.draw)}</em>`:''}</div>`).join('');
+  }else jp.classList.add('hidden');
+
+  // stage: spotlight or grid
+  const grid=$('#bGrid');
+  const stale=cmd.at&&db.cmd.holdSecs&&(Date.now()-cmd.at)/1000>db.cmd.holdSecs;
+  const mode=stale?'all':(cmd.mode||'all');
+
+  if(mode==='recommended'){
+    const g=recommended(st.games);
+    grid.className='grid';grid.style.display='block';
+    grid.innerHTML=g?spotlight(g,st,'Recommended game'):'<div class="spot"><div class="info"><h2>Add prize data to get a recommendation</h2></div></div>';
+  }else if(mode==='number'){
+    const g=st.games.find(x=>String(x.slot)===String(cmd.value)||String(x.no)===String(cmd.value));
+    grid.className='grid';grid.style.display='block';
+    grid.innerHTML=g&&filled(g)?spotlight(g,st,'Ticket '+cmd.value):`<div class="spot"><div class="info"><h2>No ticket at ${esc(cmd.value)}</h2></div></div>`;
+  }else{
+    grid.className='grid anim';grid.style.display='';
+    const list=shownGames(st);
+    const slots=mode==='slots'?recSlots(st.games,st.view.endingAt):null;
+    grid.innerHTML=list.map((g,i)=>{
+      let dim=false,pick=false;
+      if(mode==='price')dim=+g.price!==+cmd.value;
+      if(mode==='new')dim=!g.isNew;
+      if(mode==='lucky')dim=!g.isLucky;
+      if(mode==='ending')dim=!isEnding(g,st.view.endingAt);
+      if(mode==='slots'){pick=slots.includes(g.slot);dim=!pick}
+      if(!filled(g))dim=dim||mode!=='all';
+      return ticketTile(g,i,st,{dim,pick});
+    }).join('');
+  }
+
+  // rail: ads + winners
+  const rail=$('#bRail');
+  const wantAds=st.view.showAds&&st.ads.length, wantWin=st.view.showWinners&&st.winners.length;
+  if(wantAds||wantWin){
+    rail.classList.remove('hidden');
+    rail.innerHTML=(wantAds?`<div class="ad" id="adSlot"></div>`:'')+
+      (wantWin?`<div class="win"><div class="kick">Recent winners here</div>${
+        st.winners.slice(0,6).map(w=>`<div class="w"><span>${esc(w.name)} · ${esc(w.game)}</span><b>${esc(w.amount)}</b></div>`).join('')
+      }</div>`:'');
+    clearInterval(adTimer);
+    if(wantAds){
+      const paint=()=>{const a=st.ads[adIdx%st.ads.length],el=$('#adSlot');if(!el)return;
+        el.style.opacity=0;
+        setTimeout(()=>{el.innerHTML=`<div class="kick">${esc(a.kick||'In store now')}</div>
+          ${a.img?`<img src="${esc(imgSrc(a.img))}" alt="">`:''}${a.text?`<div class="txt">${esc(a.text)}</div>`:''}`;
+          el.style.opacity=1;},220);};
+      paint();
+      adTimer=setInterval(()=>{adIdx++;paint()},Math.max(3,+st.view.adSecs||8)*1000);
+    }
+  }else{rail.classList.add('hidden');clearInterval(adTimer)}
+}
+
+/* ---------------- COUNTER APP ---------------- */
+function pushCmd(mode,value=''){
+  db.cmd={mode,value,at:Date.now(),holdSecs:db.cmd?.holdSecs??30};
+  save();renderCounter();
+  if(!location.hash||location.hash==='#board')renderBoard();
+}
+function renderCounter(){
+  const st=S(),cmd=db.cmd||{mode:'all'};
+  const used=[...new Set(st.games.filter(filled).map(g=>+g.price).filter(Boolean))].sort((a,b)=>a-b);
+  $('#cPrices').innerHTML=(used.length?used:[1,2,5,10]).map(p=>
+    `<button class="cb ${cmd.mode==='price'&&+cmd.value===p?'on':''}" data-price="${p}"><span class="pz">$${p}</span></button>`).join('');
+  $('#cSell').innerHTML=(used.length?used:[1,2,5,10]).map(p=>
+    `<button class="cb" data-sell="${p}"><span class="pz">$${p}</span><span style="font-size:11px;font-weight:600">sold</span></button>`).join('');
+  $$('#counter [data-mode]').forEach(b=>b.classList.toggle('on',b.dataset.mode===cmd.mode));
+  const label={all:'SHOWING ALL',price:'SHOWING $'+cmd.value,new:'NEW TICKETS',lucky:'LUCKY TICKETS',
+    ending:'ENDING TICKETS',recommended:'RECOMMENDED',slots:'RECOMMENDED SLOTS',number:'TICKET '+cmd.value}[cmd.mode]||'SHOWING ALL';
+  $('#cStatus').textContent=label;
+}
+function logSale(price){
+  const st=S(),d=new Date().toISOString().slice(0,10);
+  st.sales[d]=st.sales[d]||{};
+  st.sales[d][price]=(st.sales[d][price]||0)+1;
+  save();toast(`$${price} ticket logged`);
+}
+
+/* ---------------- BACKEND ---------------- */
+let aTab='games';
+const TABS=[['games','Games'],['brand','Branding'],['ads','Advertisements'],['jackpots','Jackpots'],
+  ['winners','Winners'],['sales','Sales'],['stores','Stores & managers'],['data','Lottery data']];
+
+function renderAdmin(){
+  const st=S();
+  $('#aStoreName').textContent=st.name;
+  $('#aStore').innerHTML=db.stores.map(s=>`<option value="${s.id}" ${s.id===db.active?'selected':''}>${esc(s.name)}</option>`).join('');
+  $('#aTabs').innerHTML=TABS.map(([k,l])=>`<button class="tab ${aTab===k?'on':''}" data-tab="${k}">${l}</button>`).join('');
+  $('#aBody').innerHTML=({games:tabGames,brand:tabBrand,ads:tabAds,jackpots:tabJp,winners:tabWin,
+    sales:tabSales,stores:tabStores,data:tabData}[aTab]||tabGames)(st);
+}
+function tabGames(st){
+  return `<div class="panel">
+    <div class="ph"><h3>The 40 games</h3>
+      <span class="hint">Game no. + name + price + picture. "Prizes left" drives ONLY N LEFT; "Current" is the ticket you're on in the pack.</span>
+      <div class="sp"></div><span class="hint" style="color:var(--r);font-family:var(--mono);font-weight:800">${st.games.filter(filled).length} of 40 filled</span>
+      <button class="btn sm danger" id="gClear">Clear all</button></div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th style="width:64px">Slot</th><th style="width:72px">Game no.</th><th>Game name</th>
+        <th style="width:82px">Price</th><th style="width:74px">Prizes left</th><th style="width:74px">Current</th>
+        <th style="width:190px">Flags</th><th style="width:140px">Swap</th><th style="width:200px">Picture</th><th style="width:60px"></th></tr></thead>
+      <tbody>${st.games.map((g,i)=>`<tr>
+        <td><div style="display:flex;align-items:center;gap:5px">
+          <span class="rno" style="font-size:14px">${String(g.slot).padStart(2,'0')}</span>
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <button class="btn sm" data-up="${i}" ${i===0?'disabled':''} title="Move up a slot" style="padding:0 5px;line-height:1.35">▲</button>
+            <button class="btn sm" data-down="${i}" ${i===39?'disabled':''} title="Move down a slot" style="padding:0 5px;line-height:1.35">▼</button>
+          </div></div></td>
+        <td><input class="in mono" data-f="no" data-i="${i}" value="${esc(g.no)}" maxlength="6" placeholder="—"></td>
+        <td><input class="in" data-f="name" data-i="${i}" value="${esc(g.name)}" placeholder="Game name"></td>
+        <td><select class="in mono" data-f="price" data-i="${i}"><option value="">—</option>
+          ${PRICES.map(p=>`<option value="${p}" ${+g.price===p?'selected':''}>$${p}</option>`).join('')}</select></td>
+        <td><input class="in mono" data-f="prizesLeft" data-i="${i}" value="${esc(g.prizesLeft)}" placeholder="—"></td>
+        <td><input class="in mono" data-f="current" data-i="${i}" value="${esc(g.current)}" placeholder="—"></td>
+        <td><div style="display:flex;gap:9px">
+          <label class="chk"><input type="checkbox" data-flag="isNew" data-i="${i}" ${g.isNew?'checked':''}>New</label>
+          <label class="chk"><input type="checkbox" data-flag="isLucky" data-i="${i}" ${g.isLucky?'checked':''}>Lucky</label>
+          <label class="chk" title="${esc(g.endDate?'Ends '+g.endDate:'')}"><input type="checkbox" data-flag="closing" data-i="${i}" ${g.closing?'checked':''}>Closing</label></div></td>
+        <td><select class="in mono" data-swap="${i}" style="width:130px;font-size:12px">
+          <option value="">Swap with…</option>
+          ${st.games.map((s,j)=>j===i?'':`<option value="${j}">${String(s.slot).padStart(2,'0')} · ${filled(s)?esc(s.name.slice(0,14)):'open'}</option>`).join('')}
+        </select></td>
+        <td><div class="imgcell">
+          <div class="thumb ${g.img?'':'none'}">${g.img?`<img src="${esc(imgSrc(g.img))}">`:'no pic'}</div>
+          <button class="btn sm" data-pick="${i}">Choose</button>
+          <button class="btn sm" data-link="${i}">Link</button></div></td>
+        <td>${filled(g)?`<button class="btn sm danger" data-wipe="${i}">Clear</button>`:''}</td></tr>`).join('')}
+      </tbody></table></div>
+    <div class="pb"><div class="note"><div><b>The two numbers.</b> <b>Prizes left</b> is how many top prizes the state still shows
+      for that game — when it drops to your "ending" threshold the tile turns red and reads ONLY N LEFT.
+      <b>Current</b> is the ticket number you're on in the open pack, shown small on the right of each tile.</div></div></div>
+  </div>`;
+}
+function tabBrand(st){
+  const b=st.brand;
+  return `<div class="panel"><div class="ph"><h3>Branded display</h3><span class="hint">Your name, your logo, your colors</span></div>
+    <div class="pb"><div class="fields">
+      <div class="f" style="flex:1;min-width:220px"><label>Display title</label><input id="bT" value="${esc(b.title)}"></div>
+      <div class="f" style="min-width:160px"><label>Subtitle</label><input id="bS" value="${esc(b.sub)}"></div>
+      <div class="f"><label>Logo</label><div style="display:flex;gap:7px;align-items:center">
+        <div class="thumb ${b.logo?'':'none'}" style="width:56px;height:40px">${b.logo?`<img src="${esc(imgSrc(b.logo))}">`:'none'}</div>
+        <button class="btn sm" id="bLogoPick">Upload</button>
+        <button class="btn sm" id="bLogoLink">Link</button>
+        ${b.logo?'<button class="btn sm danger" id="bLogoDel">×</button>':''}</div></div>
+      <div class="f"><label>Columns on TV</label><select id="bCols">${[4,5,6,7,8,10].map(n=>`<option value="${n}" ${+st.view.cols===n?'selected':''}>${n} across</option>`).join('')}</select></div>
+      <div class="f"><label>Empty slots</label><select id="bEmpty">
+        <option value="show" ${st.view.empty==='show'?'selected':''}>Show as blanks</option>
+        <option value="hide" ${st.view.empty==='hide'?'selected':''}>Hide</option></select></div>
+      <div class="f"><label>Order by</label><select id="bSort">
+        <option value="slot" ${st.view.sort==='slot'?'selected':''}>Slot</option>
+        <option value="num" ${st.view.sort==='num'?'selected':''}>Game number</option>
+        <option value="price" ${st.view.sort==='price'?'selected':''}>Price</option></select></div>
+      <div class="f"><label>"Ending" when prizes left ≤</label><input id="bEnd" class="mono" type="number" min="0" value="${+st.view.endingAt}" style="width:80px"></div>
+      <div class="f"><label>Tile style</label><select id="bTile">
+        <option value="card" ${(st.view.tile||'card')==='card'?'selected':''}>Ticket cards</option>
+        <option value="rack" ${st.view.tile==='rack'?'selected':''}>Rack slots</option></select></div>
+    </div></div></div>
+
+    <div class="panel"><div class="ph"><h3>Theme</h3><span class="hint">Pick a look, then fine-tune the accent</span></div>
+      <div class="pb"><div class="themes">${Object.entries(THEMES).map(([k,t])=>`
+        <button class="th ${b.theme===k?'on':''}" data-theme="${k}">
+          <div class="bars"><i style="background:${t.bg}"></i><i style="background:${t.bg2}"></i><i style="background:${t.accent}"></i></div>
+          <b>${t.name}</b></button>`).join('')}</div>
+        <div style="margin-top:14px"><div class="f"><label>Accent color</label>
+          <div class="swatch">${ACCENTS.map(c=>`<button class="sw ${b.accent===c?'on':''}" data-accent="${c}" style="background:${c}"></button>`).join('')}
+            <input type="color" id="bAcc" value="${b.accent}" style="width:34px;height:34px;padding:1px;border:1.5px solid var(--bd-2);border-radius:8px;background:#fff">
+          </div></div></div>
+      </div></div>
+
+    <div class="panel"><div class="ph"><h3>Background</h3><span class="hint">Theme color, an image, or a looping video</span></div>
+      <div class="pb"><div class="fields">
+        <div class="f"><label>Type</label><select id="bBgType">
+          <option value="theme" ${b.bgType==='theme'?'selected':''}>Theme color</option>
+          <option value="image" ${b.bgType==='image'?'selected':''}>Image</option>
+          <option value="video" ${b.bgType==='video'?'selected':''}>Video (link)</option></select></div>
+        <div class="f"><label>Background image</label><div style="display:flex;gap:7px;align-items:center">
+          <div class="thumb ${b.bgImage?'':'none'}" style="width:64px;height:40px">${b.bgImage?`<img src="${esc(imgSrc(b.bgImage))}">`:'none'}</div>
+          <button class="btn sm" id="bBgPick">Upload</button>
+          <button class="btn sm" id="bBgLink">Link</button>
+          ${b.bgImage?'<button class="btn sm danger" id="bBgDel">×</button>':''}</div></div>
+        <div class="f" style="flex:1;min-width:260px"><label>Video link (mp4/webm)</label>
+          <input id="bBgVid" value="${esc(b.bgVideo)}" placeholder="https://…/loop.mp4"></div>
+      </div>
+      <div class="note" style="margin-top:12px"><div>Videos are linked, not uploaded — a video file is far too big for browser storage.
+        Drop the .mp4 next to <b>index.html</b> and use a plain filename like <b>loop.mp4</b>, or paste a URL.</div></div>
+      </div></div>`;
+}
+function tabAds(st){
+  return `<div class="panel"><div class="ph"><h3>Store advertisements</h3>
+      <span class="hint">These rotate in the rail beside the tickets — advertise where you know people are looking</span>
+      <div class="sp"></div>
+      <div class="f" style="margin:0"><label>Seconds each</label><input id="adSecs" class="in mono" type="number" min="3" value="${+st.view.adSecs}" style="width:70px"></div>
+      <label class="chk"><input type="checkbox" id="adOn" ${st.view.showAds?'checked':''}> Show on TV</label>
+      <button class="btn sm go" id="adAdd">Add ad</button></div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th style="width:120px">Picture</th><th style="width:170px">Kicker</th><th>Message</th><th style="width:70px"></th></tr></thead>
+      <tbody>${st.ads.length?st.ads.map((a,i)=>`<tr>
+        <td><div class="imgcell"><div class="thumb ${a.img?'':'none'}">${a.img?`<img src="${esc(imgSrc(a.img))}">`:'none'}</div>
+          <button class="btn sm" data-adpick="${i}">Choose</button>
+          <button class="btn sm" data-adlink="${i}">Link</button>
+          ${a.img?`<button class="btn sm danger" data-adnoimg="${i}">×</button>`:''}</div></td>
+        <td><input class="in" data-ad="kick" data-i="${i}" value="${esc(a.kick)}" placeholder="In store now"></td>
+        <td><input class="in" data-ad="text" data-i="${i}" value="${esc(a.text)}" placeholder="2 hot dogs for $3"></td>
+        <td><button class="btn sm danger" data-addel="${i}">Remove</button></td></tr>`).join(''):
+        '<tr><td colspan="4" style="text-align:center;color:var(--ink-3);padding:26px">No ads yet. Add one to fill the rail.</td></tr>'}
+      </tbody></table></div></div>`;
+}
+function tabJp(st){
+  return `<div class="panel"><div class="ph"><h3>Current jackpots</h3>
+      <span class="hint">Shown in the strip under the header</span><div class="sp"></div>
+      <label class="chk"><input type="checkbox" id="jpOn" ${st.view.showJp?'checked':''}> Show on TV</label>
+      <button class="btn sm go" id="jpAdd">Add jackpot</button></div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th>Game</th><th style="width:180px">Amount</th><th style="width:180px">Next draw</th><th style="width:70px"></th></tr></thead>
+      <tbody>${st.jackpots.length?st.jackpots.map((j,i)=>`<tr>
+        <td><input class="in" data-jp="game" data-i="${i}" value="${esc(j.game)}" placeholder="Powerball"></td>
+        <td><input class="in mono" data-jp="amount" data-i="${i}" value="${esc(j.amount)}" placeholder="$182M"></td>
+        <td><input class="in" data-jp="draw" data-i="${i}" value="${esc(j.draw)}" placeholder="Wed 10:12pm"></td>
+        <td><button class="btn sm danger" data-jpdel="${i}">Remove</button></td></tr>`).join(''):
+        '<tr><td colspan="4" style="text-align:center;color:var(--ink-3);padding:26px">No jackpots listed.</td></tr>'}
+      </tbody></table></div>
+    <div class="pb"><div class="note"><div><b>These are typed in, not live.</b> A live feed needs a server that can call the lottery API —
+      this app runs entirely on your machine. Update them when the draw changes, or see the <b>Lottery data</b> tab to pull from a feed you control.</div></div></div></div>`;
+}
+function tabWin(st){
+  return `<div class="panel"><div class="ph"><h3>Store winners</h3><span class="hint">Create winner awareness and local buzz</span>
+      <div class="sp"></div><label class="chk"><input type="checkbox" id="wOn" ${st.view.showWinners?'checked':''}> Show on TV</label>
+      <button class="btn sm go" id="wAdd">Add winner</button></div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th>Winner</th><th>Game</th><th style="width:150px">Amount</th><th style="width:140px">When</th><th style="width:70px"></th></tr></thead>
+      <tbody>${st.winners.length?st.winners.map((w,i)=>`<tr>
+        <td><input class="in" data-w="name" data-i="${i}" value="${esc(w.name)}" placeholder="Dave R."></td>
+        <td><input class="in" data-w="game" data-i="${i}" value="${esc(w.game)}" placeholder="Lady Luck 7s"></td>
+        <td><input class="in mono" data-w="amount" data-i="${i}" value="${esc(w.amount)}" placeholder="$5,000"></td>
+        <td><input class="in" data-w="date" data-i="${i}" value="${esc(w.date)}" placeholder="Last week"></td>
+        <td><button class="btn sm danger" data-wdel="${i}">Remove</button></td></tr>`).join(''):
+        '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:26px">No winners posted yet.</td></tr>'}
+      </tbody></table></div></div>`;
+}
+function tabSales(st){
+  const days=Object.keys(st.sales).sort().reverse();
+  const sum=obj=>Object.entries(obj||{}).reduce((a,[p,n])=>({t:a.t+n,r:a.r+n*+p}),{t:0,r:0});
+  const today=sum(st.sales[new Date().toISOString().slice(0,10)]);
+  const month=new Date().toISOString().slice(0,7);
+  const mo=days.filter(d=>d.startsWith(month)).reduce((a,d)=>{const s=sum(st.sales[d]);return{t:a.t+s.t,r:a.r+s.r}},{t:0,r:0});
+  const yr=days.filter(d=>d.startsWith(month.slice(0,4))).reduce((a,d)=>{const s=sum(st.sales[d]);return{t:a.t+s.t,r:a.r+s.r}},{t:0,r:0});
+  return `<div class="cards">
+      <div class="stat"><div class="k">Sold today</div><div class="v">${today.t}</div></div>
+      <div class="stat"><div class="k">Today's revenue</div><div class="v" style="color:#157F3B">$${today.r}</div></div>
+      <div class="stat"><div class="k">This month</div><div class="v">${mo.t} · $${mo.r}</div></div>
+      <div class="stat"><div class="k">This year</div><div class="v">${yr.t} · $${yr.r}</div></div>
+    </div>
+    <div class="panel"><div class="ph"><h3>Daily sales</h3><span class="hint">Tickets logged from the counter app</span>
+      <div class="sp"></div><button class="btn sm" id="salesCsv">Export CSV</button></div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th style="width:130px">Date</th>${PRICES.map(p=>`<th class="rno">$${p}</th>`).join('')}<th>Tickets</th><th>Revenue</th></tr></thead>
+        <tbody>${days.length?days.map(d=>{const s=sum(st.sales[d]);
+          return `<tr><td class="rno">${d}</td>${PRICES.map(p=>`<td class="rno">${st.sales[d][p]||''}</td>`).join('')}
+            <td><b>${s.t}</b></td><td style="color:#157F3B"><b>$${s.r}</b></td></tr>`}).join(''):
+          `<tr><td colspan="${PRICES.length+3}" style="text-align:center;color:var(--ink-3);padding:26px">No sales logged. Use the counter app's "Log a sale" buttons.</td></tr>`}
+        </tbody></table></div></div>`;
+}
+function tabStores(st){
+  return `<div class="panel"><div class="ph"><h3>Stores</h3><span class="hint">Each store has its own board, games, ads and sales</span>
+      <div class="sp"></div><button class="btn sm go" id="stAdd">Add store</button></div>
+    <div style="overflow-x:auto"><table><thead><tr><th>Store</th><th style="width:150px">Games filled</th><th style="width:150px"></th></tr></thead>
+      <tbody>${db.stores.map(s=>`<tr>
+        <td><input class="in" data-st="${s.id}" value="${esc(s.name)}"></td>
+        <td class="rno">${s.games.filter(filled).length} of 40</td>
+        <td style="text-align:right">${s.id===db.active?'<span class="rno" style="color:var(--r)">ACTIVE</span>':
+          `<button class="btn sm" data-stgo="${s.id}">Switch to</button> <button class="btn sm danger" data-stdel="${s.id}">Delete</button>`}</td></tr>`).join('')}
+      </tbody></table></div></div>
+
+    <div class="panel"><div class="ph"><h3>Managers</h3><span class="hint">Who can work this store's board</span>
+      <div class="sp"></div><button class="btn sm go" id="mgAdd">Add manager</button></div>
+    <div style="overflow-x:auto"><table><thead><tr><th>Name</th><th style="width:140px">PIN</th><th style="width:170px">Role</th><th style="width:70px"></th></tr></thead>
+      <tbody>${st.managers.length?st.managers.map((m,i)=>`<tr>
+        <td><input class="in" data-mg="name" data-i="${i}" value="${esc(m.name)}"></td>
+        <td><input class="in mono" data-mg="pin" data-i="${i}" value="${esc(m.pin)}" maxlength="6"></td>
+        <td><select class="in" data-mg="role" data-i="${i}">
+          ${['Manager','Clerk','Owner'].map(r=>`<option ${m.role===r?'selected':''}>${r}</option>`).join('')}</select></td>
+        <td><button class="btn sm danger" data-mgdel="${i}">Remove</button></td></tr>`).join(''):
+        '<tr><td colspan="4" style="text-align:center;color:var(--ink-3);padding:26px">No managers added.</td></tr>'}
+      </tbody></table></div>
+    <div class="pb"><div class="note"><div><b>Managing from anywhere</b> needs a hosted server — this app lives on this machine.
+      What works today: run it on the counter PC and open the board on any device on the same Wi-Fi, and use <b>Back up</b> / <b>Restore</b>
+      to carry a store's setup between machines.</div></div></div></div>`;
+}
+let txPrice='',txQ='';
+function tabData(st){
+  const onBoard=new Set(st.games.filter(g=>g.no).map(g=>String(g.no)));
+  const prices=[...new Set(TX.map(g=>g.price))].sort((a,b)=>a-b);
+  let list=TX.filter(g=>(!txPrice||g.price===+txPrice)&&(!txQ||(g.name+' '+g.no).toLowerCase().includes(txQ.toLowerCase())));
+  const open=st.games.filter(g=>!filled(g)).length;
+  return `<div class="panel">
+    <div class="ph"><h3>Texas Lottery catalog</h3>
+      <span class="hint">Pick the slot each game goes in — that's its spot in your rack</span>
+      <div class="sp"></div>
+      <span class="hint" style="font-family:var(--mono);color:var(--r)">${open} open slots</span>
+      <button class="btn sm" id="txAuto">Auto-fill the 40</button>
+      <button class="btn sm danger" id="txWipe">Empty the board</button></div>
+    <div class="pb" style="border-bottom:1px solid #2E3547">
+      <div class="fields">
+        <div class="f"><label>Price</label><select id="txPrice"><option value="">All prices</option>
+          ${prices.map(p=>`<option value="${p}" ${+txPrice===p?'selected':''}>$${p} (${TX.filter(g=>g.price===p).length})</option>`).join('')}</select></div>
+        <div class="f" style="flex:1;min-width:220px"><label>Search</label>
+          <input id="txQ" value="${esc(txQ)}" placeholder="Game name or number…"></div>
+        <button class="btn" id="txAddAll">Add all shown</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th style="width:56px">Art</th><th style="width:74px">Game no.</th><th>Name</th>
+        <th style="width:70px">Price</th><th style="width:150px">Flags</th><th style="width:80px">On board</th>
+        <th style="width:160px">Slot</th></tr></thead>
+      <tbody>${list.map(g=>{
+        const mine=st.games.find(x=>String(x.no)===g.no);
+        return `<tr>
+        <td><div class="thumb" style="width:38px;height:38px">${imgTag({img:g.img,price:g.price,no:g.no})}</div></td>
+        <td class="rno">${g.no}</td>
+        <td><b>${esc(g.name)}</b></td>
+        <td class="rno">$${g.price}</td>
+        <td>${g.isNew?'<span class="rno" style="color:#157F3B">NEW</span> ':''}${g.feat?'<span class="rno" style="color:var(--r)">FEATURED</span> ':''}${g.closing?'<span class="rno" style="color:var(--r)">CLOSING</span>':''}</td>
+        <td>${mine?`<span class="rno" style="color:#157F3B">SLOT ${String(mine.slot).padStart(2,'0')}</span>`:''}</td>
+        <td><select class="in mono" data-txslot="${g.no}" style="width:150px">
+            <option value="">${mine?'Swap to slot…':'Add to slot…'}</option>
+            ${st.games.map((s,i)=>`<option value="${i}">${String(s.slot).padStart(2,'0')} · ${filled(s)?esc(s.name.slice(0,16)):'open'}</option>`).join('')}
+          </select></td></tr>`}).join('')||
+        '<tr><td colspan="7" style="text-align:center;color:var(--ink-3);padding:26px">No games match.</td></tr>'}
+      </tbody></table></div>
+  </div>
+
+  <div class="panel"><div class="ph"><h3>Keep it current</h3><span class="hint">Pull the live list straight from the state</span></div>
+    <div class="pb">
+      <div class="fields">
+        <button class="btn go" id="txLive">${svgSync()} Fetch live from texaslottery.com</button>
+        <button class="btn" id="txArt">${svgSync()} Download all ticket art</button>
+        <span class="hint" id="txWhen">${st.txFetchedAt?'Last fetched '+esc(st.txFetchedAt):'Using the bundled catalog (captured 13 Jul 2026)'}</span>
+        <div class="sp"></div>
+        <button class="btn" id="dPaste">Paste JSON</button>
+      </div>
+      <div class="note" style="margin-top:14px"><div>
+        <b>Fetch live</b> reads two pages on texaslottery.com — <b>Games by Price Point</b> (every current game:
+        number, name, price, start date, ticket art) and <b>Games Ending Soon</b> (which games the state has called,
+        and which have zero top prizes left). Games already on your board are updated in place; the rest just refresh
+        the catalog above.<br><br>
+        <b>Why the server does it, not the browser.</b> texaslottery.com doesn't send CORS headers, so a web page is
+        blocked from reading it. <code style="font-family:var(--mono);color:var(--r)">server.py</code> has no such limit —
+        it fetches, parses, and hands the result back. Which means <b>Fetch live only works when you're running through
+        the server</b>, not when index.html is opened as a plain file.<br><br>
+        <b>Still not published anywhere in a list: prizes remaining</b> for games that aren't closing. Those sit on each
+        game's own detail page, so <b>Prizes left</b> stays blank until you type it in — except the zero-top-prize
+        closers, which come through automatically as <b>LAST CHANCE</b>.
+      </div></div>
+    </div></div>`;
+}
+/* take a freshly fetched catalog: refresh the browse list, and refresh any game already on
+   the board IN PLACE — slots, current-ticket counts and hand-typed prizes are never disturbed */
+function applyCatalog(st,arr){
+  if(!Array.isArray(arr)||!arr.length)return{upd:0};
+  TX=arr.map(x=>({
+    no:String(x.no??'').trim(),
+    name:x.name||'',
+    price:+String(x.price??'').replace(/[^0-9.]/g,'')||0,
+    img:x.img||'',
+    feat:!!x.featured,
+    isNew:!!x.new,
+    closing:!!x.closing,
+    endDate:x.endDate||null,
+    prizesLeft:(x.prizesLeft===0||x.prizesLeft)?x.prizesLeft:null
+  })).filter(g=>g.no&&g.price);
+  let upd=0;
+  TX.forEach(g=>{
+    const s=st.games.find(y=>String(y.no)===g.no);
+    if(!s)return;
+    s.name=g.name;s.price=String(g.price);s.img=g.img;
+    s.isNew=g.isNew;s.isLucky=g.feat;
+    s.closing=!!g.closing;s.endDate=g.endDate||'';
+    // the state only ever tells us "zero left"; anything you typed by hand stays
+    if(g.prizesLeft!=null)s.prizesLeft=String(g.prizesLeft);
+    upd++;
+  });
+  return{upd};
+}
+/* swap what's in two slots — the slot numbers stay put, the games trade places */
+function swapSlots(st,i,j){
+  if(i===j||i<0||j<0||i>39||j>39)return false;
+  const a=st.games[i],b=st.games[j];
+  st.games[i]=b;st.games[j]=a;
+  st.games[i].slot=i+1;st.games[j].slot=j+1;
+  return true;
+}
+/* write a catalog game into a slot the user picked.
+   already on the board?  -> the two slots SWAP (a game never lands in two places)
+   not on the board yet?  -> it lands in the slot (caller confirms any overwrite) */
+function txAssign(st,no,idx){
+  const g=TX.find(x=>x.no===no);if(!g||idx==null||idx<0||idx>39)return false;
+  const at=st.games.findIndex(x=>String(x.no)===no);
+  if(at>=0)return swapSlots(st,at,idx);
+  const s=st.games[idx];
+  s.no=g.no;s.name=g.name;s.price=String(g.price);s.img=g.img;s.isNew=g.isNew;s.isLucky=g.feat;
+  s.closing=!!g.closing;s.endDate=g.endDate||'';
+  s.prizesLeft=g.prizesLeft!=null?String(g.prizesLeft):'';
+  s.current='';
+  return true;
+}
+/* bulk add still fills the open slots in order */
+function txAdd(st,no){
+  const g=TX.find(x=>x.no===no);if(!g)return false;
+  if(st.games.some(x=>String(x.no)===no))return false;
+  const slot=st.games.findIndex(x=>!filled(x));if(slot<0)return false;
+  return txAssign(st,no,slot);
+}
+/* a sensible 40: new + featured first, then a spread across price points */
+function txAutoFill(st){
+  st.games=blankGames();
+  const seen=new Set(),pick=[];
+  const take=g=>{if(!seen.has(g.no)&&pick.length<40){seen.add(g.no);pick.push(g)}};
+  TX.filter(g=>g.isNew).forEach(take);
+  TX.filter(g=>g.feat).forEach(take);
+  const byPrice={};TX.forEach(g=>{(byPrice[g.price]=byPrice[g.price]||[]).push(g)});
+  const prices=Object.keys(byPrice).map(Number).sort((a,b)=>a-b);
+  let round=0;
+  while(pick.length<40&&round<30){prices.forEach(p=>{const g=byPrice[p][round];if(g)take(g)});round++}
+  pick.slice(0,40).forEach((g,i)=>{const s=st.games[i];
+    s.no=g.no;s.name=g.name;s.price=String(g.price);s.img=g.img;s.isNew=g.isNew;s.isLucky=g.feat;
+    s.closing=!!g.closing;s.endDate=g.endDate||'';
+    if(g.prizesLeft!=null)s.prizesLeft=String(g.prizesLeft);});
+  return pick.length;
+}
+
+/* ---------------- admin wiring (delegated) ---------------- */
+function reRender(){renderAdmin()}
+$('#aTabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(!b)return;aTab=b.dataset.tab;renderAdmin()});
+$('#aStore').addEventListener('change',e=>{db.active=e.target.value;save();renderAdmin()});
+
+$('#aBody').addEventListener('input',e=>{
+  const st=S(),el=e.target,i=+el.dataset.i;
+  if(el.dataset.f!=null&&el.dataset.i!=null){st.games[i][el.dataset.f]=el.value;save();return}
+  if(el.dataset.ad){st.ads[i][el.dataset.ad]=el.value;save();return}
+  if(el.dataset.jp){st.jackpots[i][el.dataset.jp]=el.value;save();return}
+  if(el.dataset.w){st.winners[i][el.dataset.w]=el.value;save();return}
+  if(el.dataset.mg){st.managers[i][el.dataset.mg]=el.value;save();return}
+  if(el.dataset.st){const s=db.stores.find(x=>x.id===el.dataset.st);if(s)s.name=el.value;save();return}
+  if(el.id==='bT'){st.brand.title=el.value;save()}
+  if(el.id==='bS'){st.brand.sub=el.value;save()}
+  if(el.id==='bBgVid'){st.brand.bgVideo=el.value;save()}
+  if(el.id==='bEnd'){st.view.endingAt=+el.value||0;save()}
+  if(el.id==='adSecs'){st.view.adSecs=+el.value||8;save()}
+  if(el.id==='txQ'){txQ=el.value;const c=el.selectionStart;renderAdmin();
+    const n=$('#txQ');if(n){n.focus();n.setSelectionRange(c,c)}}
+});
+$('#aBody').addEventListener('change',e=>{
+  const st=S(),el=e.target,i=+el.dataset.i;
+  if(el.dataset.flag){st.games[i][el.dataset.flag]=el.checked;save();return}
+  if(el.id==='bCols'){st.view.cols=+el.value;save();reRender()}
+  if(el.id==='bEmpty'){st.view.empty=el.value;save()}
+  if(el.id==='bSort'){st.view.sort=el.value;save()}
+  if(el.id==='bTile'){st.view.tile=el.value;save();reRender()}
+  if(el.id==='bBgType'){st.brand.bgType=el.value;save();reRender()}
+  if(el.id==='bAcc'){st.brand.accent=el.value;save();reRender()}
+  if(el.id==='adOn'){st.view.showAds=el.checked;save()}
+  if(el.id==='jpOn'){st.view.showJp=el.checked;save()}
+  if(el.id==='wOn'){st.view.showWinners=el.checked;save()}
+  if(el.dataset.swap!=null&&el.value!==''){
+    const i=+el.dataset.swap,j=+el.value;
+    const a=st.games[i],b=st.games[j];
+    swapSlots(st,i,j);save();reRender();
+    toast(`Slot ${String(i+1).padStart(2,'0')} ↔ ${String(j+1).padStart(2,'0')}${filled(a)&&filled(b)?'':' (moved)'}`);
+    return;
+  }
+  if(el.id==='txPrice'){txPrice=el.value;renderAdmin()}
+  if(el.dataset.txslot){
+    const no=el.dataset.txslot;
+    if(el.value===''){return}
+    const idx=+el.value,target=st.games[idx];
+    const onBoardAt=st.games.findIndex(x=>String(x.no)===no);
+    if(onBoardAt<0&&filled(target)){
+      if(!confirm(`Slot ${String(target.slot).padStart(2,'0')} already holds "${target.name}".\n\nReplace it with "${TX.find(x=>x.no===no).name}"?`)){renderAdmin();return}
+    }
+    txAssign(st,no,idx);save();reRender();
+    toast(onBoardAt>=0
+      ? `Slot ${String(onBoardAt+1).padStart(2,'0')} ↔ ${String(idx+1).padStart(2,'0')}`
+      : `#${no} → slot ${String(idx+1).padStart(2,'0')}`);
+  }
+});
+$('#aBody').addEventListener('click',async e=>{
+  const st=S(),b=e.target.closest('button');if(!b)return;const d=b.dataset,i=+(d.pick??d.link??d.wipe??d.adpick??d.adlink??d.adnoimg??d.addel??d.jpdel??d.wdel??d.mgdel);
+
+  if(d.pick!=null){const img=await pickImage();if(img){st.games[i].img=img;save();reRender();toast('Picture added')}}
+  if(d.link!=null){const u=askLink(st.games[i].img);if(u!==null){st.games[i].img=u;save();reRender();toast(u?'Picture linked':'Picture cleared')}}
+  if(d.wipe!=null){st.games[i]={slot:i+1,no:'',name:'',price:'',img:'',prizesLeft:'',current:'',isNew:false,isLucky:false,closing:false,endDate:''};save();reRender();toast('Slot cleared')}
+  if(b.id==='gClear'){if(confirm('Clear all 40 games?')){st.games=blankGames();save();reRender();toast('All slots cleared')}}
+
+  if(b.id==='bLogoPick'){const img=await pickImage(280);if(img){st.brand.logo=img;save();reRender();toast('Logo added')}}
+  if(b.id==='bLogoLink'){const u=askLink(st.brand.logo,'Link to your logo (paste an image URL):');
+    if(u!==null){st.brand.logo=u;save();reRender();toast(u?'Logo linked':'Logo cleared')}}
+  if(b.id==='bLogoDel'){st.brand.logo='';save();reRender()}
+  if(b.id==='bBgPick'){const img=await pickImage(1400);if(img){st.brand.bgImage=img;st.brand.bgType='image';save();reRender();toast('Background added')}}
+  if(b.id==='bBgLink'){const u=askLink(st.brand.bgImage,'Link to a background image (paste an image URL):');
+    if(u!==null){st.brand.bgImage=u;if(u)st.brand.bgType='image';save();reRender();toast(u?'Background linked':'Background cleared')}}
+  if(b.id==='bBgDel'){st.brand.bgImage='';st.brand.bgType='theme';save();reRender();toast('Background cleared')}
+  if(d.theme){st.brand.theme=d.theme;st.brand.accent=THEMES[d.theme].accent;save();reRender();toast(THEMES[d.theme].name)}
+  if(d.accent){st.brand.accent=d.accent;save();reRender()}
+
+  if(b.id==='adAdd'){st.ads.push({kick:'In store now',text:'',img:''});save();reRender()}
+  if(d.adpick!=null){const img=await pickImage(520);if(img){st.ads[i].img=img;save();reRender();toast('Picture added')}}
+  if(d.adlink!=null){const u=askLink(st.ads[i].img,'Link to the ad picture (paste an image URL):');
+    if(u!==null){st.ads[i].img=u;save();reRender();toast(u?'Picture linked':'Picture cleared')}}
+  if(d.adnoimg!=null){st.ads[i].img='';save();reRender()}
+  if(d.addel!=null){st.ads.splice(i,1);save();reRender()}
+
+  if(b.id==='jpAdd'){st.jackpots.push({game:'',amount:'',draw:''});save();reRender()}
+  if(d.jpdel!=null){st.jackpots.splice(i,1);save();reRender()}
+
+  if(b.id==='wAdd'){st.winners.unshift({name:'',game:'',amount:'',date:''});save();reRender()}
+  if(d.wdel!=null){st.winners.splice(i,1);save();reRender()}
+
+  if(b.id==='mgAdd'){st.managers.push({name:'',pin:'',role:'Clerk'});save();reRender()}
+  if(d.mgdel!=null){st.managers.splice(i,1);save();reRender()}
+
+  if(b.id==='stAdd'){const n=prompt('Store name:');if(n&&n.trim()){const s=newStore(n.trim());db.stores.push(s);db.active=s.id;save();reRender();toast('Store added')}}
+  if(d.stgo){db.active=d.stgo;save();reRender()}
+  if(d.stdel){if(db.stores.length<2){toast('Keep at least one store');return}
+    if(confirm('Delete this store and its board?')){db.stores=db.stores.filter(x=>x.id!==d.stdel);
+      if(db.active===d.stdel)db.active=db.stores[0].id;save();reRender()}}
+
+  if(b.id==='salesCsv'){
+    const rows=[['date',...PRICES.map(p=>'$'+p),'tickets','revenue']];
+    Object.keys(st.sales).sort().forEach(d2=>{const s=st.sales[d2];
+      const t=Object.values(s).reduce((a,n)=>a+n,0),r=Object.entries(s).reduce((a,[p,n])=>a+n*+p,0);
+      rows.push([d2,...PRICES.map(p=>s[p]||0),t,r])});
+    const csv=rows.map(r=>r.join(',')).join('\n');
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+    a.download='lottery-sales.csv';a.click();URL.revokeObjectURL(a.href);toast('CSV exported');
+  }
+
+  if(d.up!=null){const i=+d.up;if(i>0){swapSlots(st,i,i-1);save();reRender()}}
+  if(d.down!=null){const i=+d.down;if(i<39){swapSlots(st,i,i+1);save();reRender()}}
+  if(b.id==='txAddAll'){
+    const list=TX.filter(g=>(!txPrice||g.price===+txPrice)&&(!txQ||(g.name+' '+g.no).toLowerCase().includes(txQ.toLowerCase())));
+    let n=0;list.forEach(g=>{if(txAdd(st,g.no))n++});
+    save();reRender();toast(n?`${n} game${n===1?'':'s'} added`:'Nothing added — board is full or already has them');}
+  if(b.id==='txAuto'){if(confirm('Replace all 40 slots with a spread of current Texas games?')){
+    const n=txAutoFill(st);save();reRender();toast(`Board filled with ${Math.min(n,40)} games`)}}
+  if(b.id==='txWipe'){if(confirm('Empty all 40 slots?')){st.games=blankGames();save();reRender();toast('Board emptied')}}
+
+  if(b.id==='txLive'){
+    if(!SERVED){toast('Start the app with server.py — a plain file can\'t reach texaslottery.com');return}
+    const label=b.innerHTML;b.disabled=true;b.textContent='Fetching…';
+    try{
+      const r=await fetch('/api/tx',{cache:'no-store',headers:{'X-Pin':PIN}});
+      const j=await r.json();
+      if(!j.ok)throw new Error(j.error||'fetch failed');
+      const n=applyCatalog(st,j.games);
+      st.txFetchedAt=new Date().toLocaleString();
+      save();reRender();
+      toast(`Live: ${j.note} · ${n.upd} on your board updated`);
+    }catch(err){
+      b.disabled=false;b.innerHTML=label;
+      toast('Could not fetch: '+err.message);
+    }
+  }
+  if(b.id==='txArt'){
+    if(!SERVED){toast('Start the app with server.py to cache the pictures');return}
+    const label=b.innerHTML;b.disabled=true;b.textContent='Downloading art…';
+    try{
+      const r=await fetch('/api/art',{cache:'no-store',headers:{'X-Pin':PIN}});
+      const j=await r.json();
+      if(!j.ok)throw new Error(j.error||'failed');
+      reRender();
+      toast(`Art ready: ${j.total} pictures on this machine${j.failed?` · ${j.failed} unavailable`:''}`);
+    }catch(err){b.disabled=false;b.innerHTML=label;toast('Could not download art: '+err.message)}
+  }
+  if(b.id==='dPaste'){
+    const text=prompt('Paste a JSON array of games:');
+    if(!text)return;
+    try{
+      const arr=JSON.parse(text);
+      if(!Array.isArray(arr))throw 0;
+      const n=applyCatalog(st,arr);
+      save();reRender();toast(`${arr.length} games loaded · ${n.upd} on your board updated`);
+    }catch(_){toast('That is not a valid JSON array of games')}
+  }
+});
+
+/* ---------------- counter wiring ---------------- */
+$('#counter').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.price)pushCmd('price',+b.dataset.price);
+  if(b.dataset.mode)pushCmd(b.dataset.mode);
+  if(b.dataset.sell){logSale(+b.dataset.sell)}
+  if(b.id==='cNumGo'){const v=$('#cNum').value.trim();if(v)pushCmd('number',v)}
+  if(b.id==='cBack')pushCmd('all');
+  if(b.id==='cToBoard')location.hash='';
+  if(b.id==='cToAdmin')location.hash='#admin';
+});
+
+/* ---------------- routing / chrome ---------------- */
+function route(){
+  const h=location.hash;
+  const isAdmin=h==='#admin',isCounter=h==='#counter';
+  if((isAdmin||isCounter)&&!pinOK()){
+    if(!askPin()){location.hash='';route();return}
+  }
+  $('#admin').classList.toggle('hidden',!isAdmin);
+  $('#counter').classList.toggle('hidden',!isCounter);
+  $('#board').classList.toggle('hidden',isAdmin||isCounter);
+  $('#chrome').classList.toggle('hidden',isAdmin||isCounter);
+  if(isAdmin)renderAdmin();else if(isCounter)renderCounter();else renderBoard();
+}
+window.addEventListener('hashchange',route);
+$('#goAdmin').onclick=()=>location.hash='#admin';
+$('#goCounter').onclick=()=>location.hash='#counter';
+$('#aBoard').onclick=()=>location.hash='';
+$('#goFull').onclick=()=>{document.fullscreenElement?document.exitFullscreen():
+  document.documentElement.requestFullscreen?.().catch(()=>toast('Full screen was blocked'))};
+
+$('#aExport').onclick=()=>{const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:'application/json'}));
+  a.download='lottery-display-backup.json';a.click();URL.revokeObjectURL(a.href);toast('Backup downloaded')};
+$('#aImportBtn').onclick=()=>$('#aImport').click();
+$('#aImport').onchange=e=>{const f=e.target.files[0];if(!f)return;const fr=new FileReader();
+  fr.onload=()=>{try{const s=JSON.parse(fr.result);if(!s.stores)throw 0;db=s;save();renderAdmin();toast('Restored')}
+    catch(_){toast('That file is not a backup')}};fr.readAsText(f)};
+
+/* same-browser tabs still sync instantly */
+window.addEventListener('storage',e=>{
+  if(e.key!==KEY||SERVED)return;
+  const s=local.get();if(!s)return;db=s;route();
+});
+/* every device polls the server — this is what makes the phone drive the TV */
+setInterval(pull,1500);
+/* the board self-refreshes so a held counter view reverts on its own */
+setInterval(()=>{if(!location.hash||location.hash==='#board')renderBoard()},5000);
+
+/* connect to the server if we're being served by it */
+(async function boot(){
+  try{
+    const r=await fetch('/api/state',{cache:'no-store'});
+    if(!r.ok)throw 0;
+    const j=await r.json();
+    SERVED=true;rev=j.rev||0;
+    if(j.state&&j.state.stores&&j.state.stores.length){db=j.state;local.set(db)}
+    else{push()}                       // first run: seed the server from this browser
+    route();setLink(true);
+  }catch(e){SERVED=false;setLink(false)}
+})();
+
+let idle;const wake=()=>{$('#chrome').classList.remove('idle');clearTimeout(idle);
+  idle=setTimeout(()=>$('#chrome').classList.add('idle'),3000)};
+['mousemove','keydown','touchstart'].forEach(ev=>window.addEventListener(ev,wake));
+wake();route();
+</script>
+</body>
+</html>
