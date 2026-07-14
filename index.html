@@ -434,6 +434,7 @@ tr:hover td{background:var(--r-lt)}
     <div class="f"><label>PIN</label><input id="lPin" inputmode="numeric" maxlength="6" placeholder="4-6 digits"></div>
     <div class="lerr" id="lErr"></div>
     <button class="cbtn2" id="lGo" style="width:100%">Sign in</button>
+    <p class="sub" id="lForgot" style="margin:14px 0 0;text-align:center"></p>
   </div>
 </div>
 
@@ -488,6 +489,8 @@ function renderLogin(){
   $('#lNameWrap').style.display=setup?'':'none';
   $('#lPhone').value='';$('#lPin').value='';$('#lName').value='';$('#lErr').textContent='';
   $('#lGo').textContent=setup?'Create & sign in':'Sign in';
+  $('#lForgot').textContent=setup?''
+    :'Forgot your PIN? Ask your Owner to reset it under Stores & accounts — or if you\'re the Owner, run reset_pin.py on the machine hosting this board.';
 }
 $('#lGo').onclick=()=>{
   const setup=!(db.accounts||[]).length;
