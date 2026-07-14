@@ -5,6 +5,3 @@ services:
     plan: free
     buildCommand: "true"
     startCommand: "python3 server.py"
-    envVars:
-      - key: PIN
-        value: "0987"

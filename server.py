@@ -29,7 +29,6 @@ import urllib.request
 import urllib.parse
 
 PORT = int(os.environ.get("PORT", "8000"))
-PIN = os.environ.get("PIN", "0987")
 STATE_FILE = "board-state.json"
 ART_DIR = "art"
 ART_BASE = "https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/"
@@ -103,6 +102,66 @@ def get_draws():
             return _draws["games"], False
 
 
+# Scratch-off catalog (Lottery data tab). Same idea as the draws cache above, just on a
+# week-long clock: new games don't show up on texaslottery.com daily, so there's no need
+# to hit the site any more often than that.
+CATALOG_FILE = "tx-scratchoffs.json"
+CATALOG_TTL = 7 * 24 * 60 * 60
+CATALOG_CHECK_EVERY = 60 * 60  # how often the background thread checks the clock
+
+
+def _merge_catalog_into_state(state, games):
+    """Same rule as the browser's applyCatalog(): update matching games in place —
+    slots, current-ticket counts and hand-typed prizes are left exactly alone."""
+    if not state or not games:
+        return 0
+    by_no = {str(g.get("no", "")).strip(): g for g in games if g.get("no")}
+    updated = 0
+    for store in state.get("stores", []):
+        for slot in store.get("games", []):
+            g = by_no.get(str(slot.get("no", "")))
+            if not g:
+                continue
+            slot["name"] = g.get("name", "")
+            slot["price"] = str(g.get("price", ""))
+            slot["img"] = g.get("img", "")
+            slot["isNew"] = bool(g.get("new"))
+            slot["isLucky"] = bool(g.get("featured"))
+            slot["closing"] = bool(g.get("closing"))
+            slot["endDate"] = g.get("endDate") or ""
+            # the state only ever tells us "zero left"; anything typed by hand stays
+            if g.get("prizesLeft") is not None:
+                slot["prizesLeft"] = str(g["prizesLeft"])
+            updated += 1
+    return updated
+
+
+def refresh_catalog_if_stale():
+    age = time.time() - os.path.getmtime(CATALOG_FILE) if os.path.exists(CATALOG_FILE) else None
+    if age is not None and age < CATALOG_TTL:
+        return
+    try:
+        import tx_fetch
+        games, note = tx_fetch.fetch_all()
+        tmp = CATALOG_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(games, f, indent=1)
+        os.replace(tmp, CATALOG_FILE)
+        with _lock:
+            n = _merge_catalog_into_state(_state, games)
+            if n:
+                save_state(_state)
+        print(f"  [catalog] weekly refresh from texaslottery.com — {note} · {n} on-board games updated")
+    except Exception as e:
+        print(f"  [catalog] weekly refresh failed, will retry later: {e}")
+
+
+def _catalog_scheduler():
+    while True:
+        time.sleep(CATALOG_CHECK_EVERY)
+        refresh_catalog_if_stale()
+
+
 def load_state():
     global _rev
     if os.path.exists(STATE_FILE):
@@ -130,6 +189,59 @@ def save_state(state):
             json.dump({"rev": _rev, "state": state}, f)
         os.replace(tmp, STATE_FILE)  # atomic: never leave a half-written file
         return _rev
+
+
+# ---------------- accounts: phone number + PIN, per-store permissions ----------------
+# Mirrors the browser's own model (see index.html's currentAccount/accountStoreIds):
+# owner sees and edits everything; manager edits their assigned store(s); clerk can only
+# log sales and push counter-app commands for their assigned store(s).
+_PHONE_DIGITS = re.compile(r"\D")
+
+
+def _norm_phone(p):
+    return _PHONE_DIGITS.sub("", p or "")
+
+
+def find_account(state, phone, pin):
+    if not state or not phone or not pin:
+        return None
+    phone_n = _norm_phone(phone)
+    if not phone_n:
+        return None
+    for a in state.get("accounts", []):
+        if _norm_phone(a.get("phone", "")) == phone_n and str(a.get("pin", "")) == str(pin):
+            return a
+    return None
+
+
+def account_can_admin(a):
+    return bool(a) and a.get("role") in ("owner", "manager")
+
+
+def clerk_write_ok(old, new):
+    """A clerk may only touch: which slot's command is showing (top-level cmd) and a
+    store's daily sales tally. Everything else — games, ads, jackpots, branding, the
+    account list itself, even which store is active — must come through unchanged."""
+    if not old:
+        return False
+    if old.get("active") != new.get("active"):
+        return False
+    if old.get("accounts") != new.get("accounts"):
+        return False
+    o_stores = {s.get("id"): s for s in old.get("stores", [])}
+    n_stores = {s.get("id"): s for s in new.get("stores", [])}
+    if set(o_stores) != set(n_stores):
+        return False
+    for sid, os_ in o_stores.items():
+        ns = n_stores[sid]
+        if set(os_.keys()) != set(ns.keys()):
+            return False
+        for key in os_:
+            if key == "sales":
+                continue
+            if os_.get(key) != ns.get(key):
+                return False
+    return True
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -161,8 +273,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if m:
             return self._art(m.group(1))
         if self.path.startswith("/api/art"):   # pre-download every picture
-            if self.headers.get("X-Pin") != PIN:
-                return self._json({"error": "wrong pin"}, 401)
+            acc = find_account(_state, self.headers.get("X-Phone"), self.headers.get("X-Pin"))
+            if not account_can_admin(acc):
+                return self._json({"error": "sign-in required"}, 401)
             return self._cache_all()
         # Any other linked picture (an ad, a logo, a background). Same story as the ticket
         # art: the source may refuse a hotlinked request, and the TV may be offline. So we
@@ -173,8 +286,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._proxy_img(url)
         # The browser can't read texaslottery.com (no CORS headers), but we can.
         if self.path.startswith("/api/tx"):
-            if self.headers.get("X-Pin") != PIN:
-                return self._json({"error": "wrong pin"}, 401)
+            acc = find_account(_state, self.headers.get("X-Phone"), self.headers.get("X-Pin"))
+            if not account_can_admin(acc):
+                return self._json({"error": "sign-in required"}, 401)
             try:
                 import tx_fetch
                 games, note = tx_fetch.fetch_all()
@@ -292,14 +406,25 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         if not self.path.startswith("/api/state"):
             return self._json({"error": "unknown endpoint"}, 404)
-        if self.headers.get("X-Pin") != PIN:
-            return self._json({"error": "wrong pin"}, 401)
         try:
             n = int(self.headers.get("Content-Length", 0))
             if n > 32 * 1024 * 1024:
                 return self._json({"error": "too large"}, 413)
             body = json.loads(self.rfile.read(n))
-            rev = save_state(body.get("state"))
+            new_state = body.get("state")
+            # no accounts saved on this server yet — this is the very write that creates
+            # the first Owner login, so there's nothing to check credentials against
+            bootstrapping = not (_state and _state.get("accounts"))
+            if not bootstrapping:
+                acc = find_account(_state, self.headers.get("X-Phone"), self.headers.get("X-Pin"))
+                if account_can_admin(acc):
+                    pass  # owner/manager: full write allowed
+                elif acc and acc.get("role") == "clerk":
+                    if not clerk_write_ok(_state, new_state):
+                        return self._json({"error": "not permitted"}, 403)
+                else:
+                    return self._json({"error": "sign-in required"}, 401)
+            rev = save_state(new_state)
             return self._json({"rev": rev})
         except Exception as e:
             return self._json({"error": str(e)}, 400)
@@ -363,6 +488,10 @@ def main():
     print("=" * 62)
 
     threading.Timer(0.6, lambda: webbrowser.open(f"http://localhost:{port}/index.html")).start()
+    # weekly catalog refresh: check right away (covers "the app was off past its 7 days"),
+    # then keep checking once an hour for whenever the week is actually up
+    threading.Thread(target=refresh_catalog_if_stale, daemon=True).start()
+    threading.Thread(target=_catalog_scheduler, daemon=True).start()
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
