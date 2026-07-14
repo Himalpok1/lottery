@@ -946,7 +946,8 @@ function tabGames(st){
     <div style="overflow-x:auto"><table>
       <thead><tr><th style="width:64px">Slot</th><th style="width:72px">Game no.</th><th>Game name</th>
         <th style="width:82px">Price</th><th style="width:74px">Prizes left</th><th style="width:74px">Current</th>
-        <th style="width:190px">Flags</th><th style="width:140px">Swap</th><th style="width:200px">Picture</th><th style="width:60px"></th></tr></thead>
+        <th style="width:190px">Flags</th><th style="width:140px">Swap</th><th style="width:170px">Assign from catalog</th>
+        <th style="width:200px">Picture</th><th style="width:60px"></th></tr></thead>
       <tbody>${st.games.map((g,i)=>`<tr>
         <td><div style="display:flex;align-items:center;gap:5px">
           <span class="rno" style="font-size:14px">${String(g.slot).padStart(2,'0')}</span>
@@ -968,6 +969,11 @@ function tabGames(st){
           <option value="">Swap with…</option>
           ${st.games.map((s,j)=>j===i?'':`<option value="${j}">${String(s.slot).padStart(2,'0')} · ${filled(s)?esc(s.name.slice(0,14)):'open'}</option>`).join('')}
         </select></td>
+        <td><select class="in mono" data-assign="${i}" style="width:160px;font-size:12px">
+          <option value="">${filled(g)?'Replace with…':'Assign game…'}</option>
+          ${TX.map(t=>{const at=st.games.findIndex(x=>String(x.no)===t.no);
+            return `<option value="${t.no}">${esc(t.no)} · ${esc(t.name.slice(0,20))} ($${t.price})${at>=0?' — on '+String(at+1).padStart(2,'0'):''}</option>`}).join('')}
+        </select></td>
         <td><div class="imgcell">
           <div class="thumb ${g.img?'':'none'}">${g.img?`<img src="${esc(imgSrc(g.img))}">`:'no pic'}</div>
           <button class="btn sm" data-pick="${i}">Choose</button>
@@ -976,7 +982,9 @@ function tabGames(st){
       </tbody></table></div>
     <div class="pb"><div class="note"><div><b>The two numbers.</b> <b>Prizes left</b> is how many top prizes the state still shows
       for that game — when it drops to your "ending" threshold the tile turns red and reads ONLY N LEFT.
-      <b>Current</b> is the ticket number you're on in the open pack, shown small on the right of each tile.</div></div></div>
+      <b>Current</b> is the ticket number you're on in the open pack, shown small on the right of each tile.<br><br>
+      <b>Assign from catalog</b> drops any of the current Texas games straight into that slot — the same catalog as the
+      <b>Lottery data</b> tab. If that game is already sitting in another slot, the two slots simply swap.</div></div></div>
   </div>`;
 }
 function tabBrand(st){
@@ -1323,6 +1331,15 @@ $('#aBody').addEventListener('change',e=>{
     const a=st.games[i],b=st.games[j];
     swapSlots(st,i,j);save();reRender();
     toast(`Slot ${String(i+1).padStart(2,'0')} ↔ ${String(j+1).padStart(2,'0')}${filled(a)&&filled(b)?'':' (moved)'}`);
+    return;
+  }
+  if(el.dataset.assign!=null&&el.value!==''){
+    const idx=+el.dataset.assign,no=el.value,g=TX.find(x=>x.no===no);
+    const onBoardAt=st.games.findIndex(x=>String(x.no)===no);
+    txAssign(st,no,idx);save();reRender();
+    toast(onBoardAt>=0&&onBoardAt!==idx
+      ? `Slot ${String(idx+1).padStart(2,'0')} ↔ ${String(onBoardAt+1).padStart(2,'0')}`
+      : `#${no} ${g?g.name:''} → slot ${String(idx+1).padStart(2,'0')}`);
     return;
   }
   if(el.id==='txPrice'){txPrice=el.value;renderAdmin()}
