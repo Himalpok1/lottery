@@ -8,6 +8,19 @@
   "details": null,
   "featured": false,
   "new": false,
+  "closing": true,
+  "endDate": "10/14/2026",
+  "prizesLeft": null
+ },
+ {
+  "no": "2735",
+  "name": "3-2-Won!",
+  "price": 1,
+  "start": "08/03/2026",
+  "img": "https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2735_200X200.gif",
+  "details": null,
+  "featured": false,
+  "new": false,
   "closing": false,
   "endDate": null,
   "prizesLeft": null
@@ -78,19 +91,6 @@
   "prizesLeft": null
  },
  {
-  "no": "2686",
-  "name": "$30,000 Gold Rush",
-  "price": 2,
-  "start": "09/15/2025",
-  "img": "https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2686_200X200.gif",
-  "details": null,
-  "featured": false,
-  "new": false,
-  "closing": true,
-  "endDate": "07/15/2026",
-  "prizesLeft": null
- },
- {
   "no": "2692",
   "name": "Patriotic Payout",
   "price": 2,
@@ -143,16 +143,16 @@
   "prizesLeft": null
  },
  {
-  "no": "2504",
-  "name": "Crossword",
-  "price": 3,
-  "start": "03/04/2024",
-  "img": "https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2504_200X200.gif",
+  "no": "2757",
+  "name": "Break the Bank",
+  "price": 2,
+  "start": "08/17/2026",
+  "img": "https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2757_200X200.gif",
   "details": null,
   "featured": false,
-  "new": false,
-  "closing": true,
-  "endDate": "07/15/2026",
+  "new": true,
+  "closing": false,
+  "endDate": null,
   "prizesLeft": null
  },
  {
@@ -242,8 +242,8 @@
   "details": null,
   "featured": false,
   "new": false,
-  "closing": false,
-  "endDate": null,
+  "closing": true,
+  "endDate": "10/14/2026",
   "prizesLeft": null
  },
  {
@@ -296,7 +296,7 @@
   "new": false,
   "closing": true,
   "endDate": "09/16/2026",
-  "prizesLeft": null
+  "prizesLeft": 0
  },
  {
   "no": "2723",
@@ -397,7 +397,7 @@
   "img": "https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2747_200X200.gif",
   "details": null,
   "featured": false,
-  "new": true,
+  "new": false,
   "closing": false,
   "endDate": null,
   "prizesLeft": null
@@ -411,6 +411,32 @@
   "details": null,
   "featured": false,
   "new": false,
+  "closing": false,
+  "endDate": null,
+  "prizesLeft": null
+ },
+ {
+  "no": "2754",
+  "name": "Cowboys",
+  "price": 5,
+  "start": "08/17/2026",
+  "img": "https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2754_200X200.gif",
+  "details": null,
+  "featured": false,
+  "new": true,
+  "closing": false,
+  "endDate": null,
+  "prizesLeft": null
+ },
+ {
+  "no": "2755",
+  "name": "Houston Texans",
+  "price": 5,
+  "start": "08/17/2026",
+  "img": "https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2755_200X200.gif",
+  "details": null,
+  "featured": false,
+  "new": true,
   "closing": false,
   "endDate": null,
   "prizesLeft": null
@@ -465,6 +491,19 @@
   "new": false,
   "closing": true,
   "endDate": "09/02/2026",
+  "prizesLeft": null
+ },
+ {
+  "no": "2650",
+  "name": "$50, $100 OR $500!",
+  "price": 10,
+  "start": "08/03/2026",
+  "img": "https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2650_200X200.gif",
+  "details": null,
+  "featured": false,
+  "new": false,
+  "closing": false,
+  "endDate": null,
   "prizesLeft": null
  },
  {
@@ -676,6 +715,19 @@
   "prizesLeft": null
  },
  {
+  "no": "2678",
+  "name": "$100, $200, $500 OR $1,000!",
+  "price": 20,
+  "start": "08/03/2026",
+  "img": "https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2678_200X200.gif",
+  "details": null,
+  "featured": false,
+  "new": false,
+  "closing": false,
+  "endDate": null,
+  "prizesLeft": null
+ },
+ {
   "no": "2685",
   "name": "Diamond 7s",
   "price": 20,
@@ -774,22 +826,22 @@
   "img": "https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2753_200X200.gif",
   "details": null,
   "featured": false,
-  "new": true,
+  "new": false,
   "closing": false,
   "endDate": null,
   "prizesLeft": null
  },
  {
-  "no": "2633",
-  "name": "$3 Million Ca$h",
-  "price": 30,
-  "start": "04/07/2025",
-  "img": "https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2633_200X200.gif",
+  "no": "2764",
+  "name": "Million Dollar Loteria",
+  "price": 20,
+  "start": "08/17/2026",
+  "img": "https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2764_200X200.gif",
   "details": null,
-  "featured": true,
-  "new": false,
-  "closing": true,
-  "endDate": "07/15/2026",
+  "featured": false,
+  "new": true,
+  "closing": false,
+  "endDate": null,
   "prizesLeft": null
  },
  {
@@ -840,8 +892,8 @@
   "details": null,
   "featured": false,
   "new": false,
-  "closing": false,
-  "endDate": null,
+  "closing": true,
+  "endDate": "09/30/2026",
   "prizesLeft": null
  },
  {
@@ -921,6 +973,19 @@
   "closing": true,
   "endDate": "08/21/2026",
   "prizesLeft": 0
+ },
+ {
+  "no": "2512",
+  "name": "Premier Winnings",
+  "price": 100,
+  "start": "08/03/2026",
+  "img": "https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2512_200X200.gif",
+  "details": null,
+  "featured": false,
+  "new": false,
+  "closing": false,
+  "endDate": null,
+  "prizesLeft": null
  },
  {
   "no": "2587",

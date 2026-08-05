@@ -241,17 +241,47 @@ button{font-family:inherit}
   --sf:#FFFFFF;       /* panels */
   --sf-2:#F7F8FA;     /* page + table head */
 }
-#admin{height:100vh;overflow:auto;background:var(--sf-2);color:var(--ink)}
-.awrap{max-width:1240px;margin:0 auto;padding:22px 20px 90px}
-.ahead{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:16px}
-.ahead h2{font-family:var(--display);font-size:27px;margin:0 0 3px;color:var(--r)}
-.ahead p{margin:0;color:var(--ink-2);font-size:13.5px}
+#admin{height:100vh;background:var(--sf-2);color:var(--ink);display:flex}
 .sp{flex:1}
-.tabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:16px;border-bottom:2px solid var(--bd);padding-bottom:10px}
-.tab{background:transparent;color:var(--ink-2);border:1px solid transparent;border-radius:9px;padding:8px 13px;
-  font-size:13.5px;font-weight:700;cursor:pointer}
-.tab:hover{color:var(--r);background:var(--r-lt)}
-.tab.on{background:var(--r);color:#fff}
+/* left sidebar — brand, then the store switcher as a labeled field (not just a bare
+   select), a clearly separated nav list as the main act, and a quiet account footer.
+   Each zone gets its own visual weight instead of one long column of same-size buttons. */
+.aside{width:220px;flex:0 0 auto;height:100vh;overflow-y:auto;background:#fff;
+  border-right:1px solid var(--bd);display:flex;flex-direction:column}
+.aBrand{padding:20px 18px 16px;border-bottom:1px solid var(--bd)}
+.aBrand h2{font-family:var(--display);font-size:18px;margin:0;color:var(--r);line-height:1.2}
+.aStoreField{padding:14px 18px;border-bottom:1px solid var(--bd)}
+.aStoreField label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--ink-3);font-weight:700;margin-bottom:6px}
+.aStoreField select{width:100%}
+.vtabs{display:flex;flex-direction:column;gap:1px;flex:1 1 auto;padding:10px 10px;overflow-y:auto}
+.vtab{background:transparent;color:var(--ink-2);border:none;border-radius:8px;padding:9px 12px;
+  font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%}
+.vtab:hover{color:var(--r);background:var(--r-lt)}
+.vtab.on{background:var(--r-lt);color:var(--r);font-weight:800}
+/* quiet footer: connection dot, one prominent action, small utility links, account —
+   nothing here competes visually with the nav list above it */
+.aFoot{border-top:1px solid var(--bd);padding:12px 14px 14px;display:flex;flex-direction:column;gap:10px}
+.aFoot #link{font-size:11px;text-align:left;padding:0}
+.aFoot .btn.go{width:100%;justify-content:center}
+.aUtil{display:flex;gap:6px}
+.aUtil .btn{flex:1;padding:7px 8px;font-size:12px}
+.aAcct{display:flex;align-items:center;gap:8px;padding-top:8px;border-top:1px solid var(--bd)}
+.aAvatar{width:26px;height:26px;border-radius:50%;background:var(--r-lt);color:var(--r);flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800}
+.aAcct .who{flex:1;min-width:0;font-size:12px;line-height:1.25}
+.aAcct .who b{display:block;color:var(--ink);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.aAcct .who span{color:var(--ink-3);font-size:11px;text-transform:capitalize}
+.aSignOut{background:none;border:none;color:var(--ink-3);font-size:11.5px;font-weight:700;cursor:pointer;padding:2px}
+.aSignOut:hover{color:var(--r)}
+.amain{flex:1 1 auto;height:100vh;overflow-y:auto}
+.awrap{max-width:1080px;margin:0 auto;padding:26px 28px 90px}
+@media(max-width:900px){
+  #admin{flex-direction:column}
+  .aside{width:100%;height:auto}
+  .vtabs{flex-direction:row;flex-wrap:wrap;overflow-y:visible}
+  .amain{height:auto}
+}
 .btn{background:#fff;color:var(--ink);border:1.5px solid var(--bd-2);border-radius:9px;padding:9px 14px;
   font-size:13.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .btn:hover{border-color:var(--r);color:var(--r)}
@@ -406,22 +436,28 @@ tr:hover td{background:var(--r-lt)}
 
 <!-- ============ BACKEND ============ -->
 <div id="admin" class="hidden">
-  <div class="awrap">
-    <div class="ahead">
-      <div><h2 id="aStoreName">Backend</h2><p>Everything on the TV is set here. Saves push to the board instantly.</p></div>
-      <div class="sp"></div>
-      <span id="link" class="rno" style="padding:9px 4px">● …</span>
-      <select id="aStore" class="in" style="width:auto;padding:9px 11px"></select>
-      <button class="btn" id="aExport">Back up</button>
-      <button class="btn" id="aImportBtn">Restore</button>
-      <input type="file" id="aImport" accept="application/json" class="hidden">
+  <div class="aside">
+    <div class="aBrand"><h2 id="aStoreName">Backend</h2></div>
+    <div class="aStoreField"><label>Store</label><select id="aStore" class="in"></select></div>
+    <nav class="vtabs" id="aTabs"></nav>
+    <div class="aFoot">
+      <span id="link" class="rno">● …</span>
       <button class="btn go" id="aBoard">Open TV board</button>
-      <span class="lwho">Signed in as <b id="aWho"></b></span>
-      <button class="btn sm" id="aSignOut">Sign out</button>
+      <div class="aUtil">
+        <button class="btn" id="aExport">Back up</button>
+        <button class="btn" id="aImportBtn">Restore</button>
+        <input type="file" id="aImport" accept="application/json" class="hidden">
+      </div>
+      <div class="aAcct">
+        <div class="aAvatar" id="aAvatar"></div>
+        <div class="who"><b id="aWho"></b><span id="aWhoRole"></span></div>
+        <button class="aSignOut" id="aSignOut">Sign out</button>
+      </div>
     </div>
-    <div class="tabs" id="aTabs"></div>
-    <div id="aBody"></div>
   </div>
+  <div class="amain"><div class="awrap">
+    <div id="aBody"></div>
+  </div></div>
 </div>
 
 <!-- ============ LOGIN ============ -->
@@ -487,7 +523,10 @@ function renderLogin(){
     ?'First time here — set up the master login for this board. You\'ll use this phone number and PIN on every device from now on.'
     :'Enter the phone number and PIN your store gave you.';
   $('#lNameWrap').style.display=setup?'':'none';
-  $('#lPhone').value='';$('#lPin').value='';$('#lName').value='';$('#lErr').textContent='';
+  // never clobber what's mid-typing — a poll landing between keystrokes would otherwise
+  // wipe the field out from under whoever's signing in
+  const typingHere=document.activeElement&&['lPhone','lPin','lName'].includes(document.activeElement.id);
+  if(!typingHere){$('#lPhone').value='';$('#lPin').value='';$('#lName').value='';$('#lErr').textContent=''}
   $('#lGo').textContent=setup?'Create & sign in':'Sign in';
   $('#lForgot').textContent=setup?''
     :'Forgot your PIN? Ask your Owner to reset it under Stores & accounts — or if you\'re the Owner, run reset_pin.py on the machine hosting this board.';
@@ -533,9 +572,11 @@ async function pull(){
     const r=await fetch('/api/rev',{cache:'no-store'});
     const j=await r.json();
     if(j.rev===rev){setLink(true);return}
-    // don't yank a field out from under someone who's typing in the backend
+    // don't yank a field out from under someone who's typing in the backend —
+    // or on the login screen itself, which can be showing on #admin or #counter
     const typing=document.activeElement&&/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
-    if(typing&&location.hash==='#admin')return;
+    const onLogin=!$('#login').classList.contains('hidden');
+    if(typing&&(location.hash==='#admin'||onLogin))return;
     pulling=true;
     const r2=await fetch('/api/state',{cache:'no-store'});
     const j2=await r2.json();
@@ -632,6 +673,10 @@ let TX=[
 ];
 
 const PRICES=[1,2,3,5,10,20,30,50,100];
+/* Lotto pull-tab machine: 38 fixed dispensing boxes, each a set price tier — from the
+   Fina Waxahachie daily reconciliation sheet. A store's own machine may be wired up
+   differently, so this is just the starting point; each store can retune it. */
+const LOTTO_BOX_PRICES=[100,50,50,50,50,30,20,20,20,20,20,20,20,10,10,10,10,10,5,5,5,5,5,5,5,5,5,20,10,5,5,5,2,0,3,3,2,3];
 const TIER={1:'--t1',2:'--t2',3:'--t3',5:'--t5',10:'--t10',20:'--t20',30:'--t30',50:'--t50',100:'--t100'};
 const tierColor=p=>`var(${TIER[+p]||'--tx'})`;
 /* Ticket art. A Texas Lottery picture is served from our own machine (/art/2747.gif) —
@@ -689,14 +734,32 @@ const newStore=(name)=>({
   brand:{title:name,sub:'Scratch-Offs',logo:'',theme:'texas',accent:'#D62828',
          bgType:'theme',bgImage:'',bgVideo:''},
   view:{cols:'auto',empty:'show',sort:'slot',endingAt:3,tile:'card',showJp:true,showDraws:true,showAds:true,showWinners:true,adSecs:8},
-  games:blankGames(),ads:[],jackpots:[],winners:[],sales:{},feedUrl:''
+  games:blankGames(),ads:[],jackpots:[],winners:[],sales:{},lotto:{},lottoBoxPrices:[...LOTTO_BOX_PRICES],feedUrl:''
 });
 const fresh=()=>{const s=newStore('Swing by Maypearl');return{stores:[s],active:s.id,
   cmd:{mode:'all',value:'',at:0,holdSecs:30},accounts:[]}};
 
 /* boards saved before accounts existed just get an empty list — the login screen then
    offers to set up the first Owner, same as any brand-new board */
-const normalizeDb=d=>{if(d&&!Array.isArray(d.accounts))d.accounts=[];return d};
+const normalizeDb=d=>{
+  if(!d)return d;
+  if(!Array.isArray(d.accounts))d.accounts=[];
+  (d.stores||[]).forEach(s=>{
+    if(!s.lotto||typeof s.lotto!=='object')s.lotto={};
+    if(!Array.isArray(s.lottoBoxPrices)||s.lottoBoxPrices.length!==38)s.lottoBoxPrices=[...LOTTO_BOX_PRICES];
+    // each day keeps its own {price,qty} per box now, not one store-wide price list —
+    // migrate anything from the older shape (a bare qty array) using today's prices,
+    // which is the best guess available for data saved before this changed
+    Object.values(s.lotto).forEach(e=>{
+      if(!Array.isArray(e.boxes)||e.boxes.length!==38){
+        const oldQty=Array.isArray(e.qty)?e.qty:null;
+        e.boxes=s.lottoBoxPrices.map((p,i)=>({price:String(p),qty:oldQty?String(oldQty[i]||''):''}));
+      }
+      delete e.qty;
+    });
+  });
+  return d;
+};
 let db=normalizeDb((()=>{const s=local.get();return (s&&s.stores&&s.stores.length)?s:fresh()})());
 const S=()=>db.stores.find(s=>s.id===db.active)||db.stores[0];
 
@@ -1009,7 +1072,7 @@ function logSale(price){
 /* ---------------- BACKEND ---------------- */
 let aTab='games';
 const TABS=[['games','Games'],['brand','Branding'],['ads','Advertisements'],['jackpots','Jackpots'],
-  ['winners','Winners'],['sales','Sales'],['stores','Stores & accounts'],['data','Lottery data']];
+  ['winners','Winners'],['sales','Sales'],['lotto','Lotto Reporting'],['stores','Stores & accounts'],['data','Lottery data']];
 /* Stores & accounts (adding/removing stores, managing who can log in) is Owner-only —
    a manager can run their store day to day but can't touch the store list or accounts */
 const visibleTabs=acc=>acc&&acc.role==='owner'?TABS:TABS.filter(([k])=>k!=='stores');
@@ -1019,12 +1082,14 @@ function renderAdmin(){
   const tabs=visibleTabs(acc);
   if(!tabs.some(([k])=>k===aTab))aTab=tabs[0][0];
   $('#aStoreName').textContent=st.name;
-  $('#aWho').textContent=acc?`${acc.name||acc.phone} (${acc.role})`:'';
+  $('#aWho').textContent=acc?(acc.name||acc.phone):'';
+  $('#aWhoRole').textContent=acc?acc.role:'';
+  $('#aAvatar').textContent=acc?(acc.name||acc.phone||'?').trim().charAt(0).toUpperCase():'';
   const myStores=acc.role==='owner'?db.stores:db.stores.filter(s=>accountStoreIds(acc).includes(s.id));
   $('#aStore').innerHTML=myStores.map(s=>`<option value="${s.id}" ${s.id===db.active?'selected':''}>${esc(s.name)}</option>`).join('');
-  $('#aTabs').innerHTML=tabs.map(([k,l])=>`<button class="tab ${aTab===k?'on':''}" data-tab="${k}">${l}</button>`).join('');
+  $('#aTabs').innerHTML=tabs.map(([k,l])=>`<button class="vtab ${aTab===k?'on':''}" data-tab="${k}">${l}</button>`).join('');
   $('#aBody').innerHTML=({games:tabGames,brand:tabBrand,ads:tabAds,jackpots:tabJp,winners:tabWin,
-    sales:tabSales,stores:tabStores,data:tabData}[aTab]||tabGames)(st);
+    sales:tabSales,lotto:tabLotto,stores:tabStores,data:tabData}[aTab]||tabGames)(st);
 }
 function tabGames(st){
   return `<div class="panel">
@@ -1212,6 +1277,108 @@ function tabSales(st){
             <td><b>${s.t}</b></td><td style="color:#157F3B"><b>$${s.r}</b></td></tr>`}).join(''):
           `<tr><td colspan="${PRICES.length+3}" style="text-align:center;color:var(--ink-3);padding:26px">No sales logged. Use the counter app's "Log a sale" buttons.</td></tr>`}
         </tbody></table></div></div>`;
+}
+/* Lotto machine reconciliation, mirroring the Fina Waxahachie daily sheet exactly:
+   OPEN/CLOSE are the machine's meter reading (ticket inventory value) at the start/end
+   of the day — it counts DOWN as tickets dispense. ADD covers a fresh roll loaded
+   mid-day, ONLINE any online-lotto adjustment. Below that, 38 fixed boxes each hold a
+   ticket at some price; QUANTITY is what's left in that box, VALUE = price × qty.
+   The 38 box values should sum to CLOSE — that's the over/short check, the same way the
+   sheet's own box-total row sits right next to CLOSE for each day.
+
+   A box's PRICE is recorded PER DAY, not once for the whole store — a box is a physical
+   dispenser slot, and the ticket loaded into it can change (sell out a $50 roll, load a
+   $20 roll in its place). Each day snapshots its own {price, qty} per box, seeded from
+   the day before, so swapping a box's ticket only affects today onward: yesterday's
+   record still shows the $50 price it actually was, it doesn't get silently rewritten. */
+const lottoBoxValue=(e,i)=>{const b=(e.boxes||[])[i]||{};return(+b.price||0)*(+b.qty||0)};
+const lottoBoxTotal=e=>(e.boxes||[]).reduce((a,_,i)=>a+lottoBoxValue(e,i),0);
+const lottoSold=e=>(+e.open||0)-(+e.close||0)+(+e.add||0)+(+e.online||0);
+const lottoOverShort=e=>lottoBoxTotal(e)-(+e.close||0);
+let ltEditDate=null;
+function tabLotto(st){
+  st.lotto=st.lotto||{};
+  const dates=Object.keys(st.lotto).sort().reverse();
+  const today=new Date().toISOString().slice(0,10);
+  const month=today.slice(0,7);
+  const mo=dates.filter(d=>d.startsWith(month)).reduce((a,d)=>{const e=st.lotto[d];
+    return{sold:a.sold+lottoSold(e),mismatch:a.mismatch+(lottoOverShort(e)!==0?1:0)}},{sold:0,mismatch:0});
+  const osColor=n=>n===0?'#157F3B':Math.abs(n)<20?'#B8860B':'#D62828';
+  if(ltEditDate&&!st.lotto[ltEditDate])ltEditDate=null;
+
+  if(ltEditDate){
+    const d=ltEditDate,e=st.lotto[d],sold=lottoSold(e),boxTotal=lottoBoxTotal(e),os=lottoOverShort(e);
+    const prevDate=Object.keys(st.lotto).filter(x=>x<d).sort().reverse()[0];
+    const prevBoxes=prevDate?st.lotto[prevDate].boxes:null;
+    return `<div class="panel"><div class="ph">
+        <h3>${d}</h3><span class="hint">Machine meter, then the 38-box breakdown</span>
+        <div class="sp"></div><button class="btn sm" id="ltBack">← Back to all days</button></div>
+      <div class="pb"><div class="fields">
+        <div class="f"><label>Open</label><input class="in mono" data-lt="open" data-date="${d}" value="${esc(e.open)}" style="width:110px"></div>
+        <div class="f"><label>Add</label><input class="in mono" data-lt="add" data-date="${d}" value="${esc(e.add)}" style="width:90px"></div>
+        <div class="f"><label>Online</label><input class="in mono" data-lt="online" data-date="${d}" value="${esc(e.online)}" style="width:90px"></div>
+        <div class="f"><label>Close</label><input class="in mono" data-lt="close" data-date="${d}" value="${esc(e.close)}" style="width:110px"></div>
+        <div class="f"><label>Sold</label><div class="in mono" style="width:110px;background:var(--sf-2);${sold<0?'color:#D62828':''}"><b>$${sold.toFixed(2)}</b></div></div>
+        <div class="f"><label>Box total</label><div class="in mono" style="width:110px;background:var(--sf-2)"><b>$${boxTotal.toFixed(2)}</b></div></div>
+        <div class="f"><label>Over/short</label><div class="in mono" style="width:110px;background:var(--sf-2);color:${osColor(os)}"><b>${os>=0?'+':''}$${os.toFixed(2)}</b></div></div>
+      </div></div></div>
+
+      <div class="panel"><div class="ph"><h3>Boxes</h3>
+        <span class="hint">${prevDate?`Compared against ${prevDate}. A box's price only changes here, on the day you actually swap its ticket — past days keep their own recorded price.`:'Price and quantity left in each box, as of today'}</span>
+        </div>
+        <div style="overflow-x:auto"><table>
+          <thead><tr><th style="width:60px">Box</th><th style="width:90px">Price</th><th style="width:110px">Quantity</th>
+            <th style="width:130px">${prevDate?'Change':''}</th><th style="width:110px">Value</th></tr></thead>
+          <tbody>${e.boxes.map((b,i)=>{
+            const prevB=prevBoxes?prevBoxes[i]:null;
+            const priceChanged=prevB&&prevB.price!==''&&b.price!==''&&+prevB.price!==+b.price;
+            const delta=(!priceChanged&&prevB&&prevB.qty!==''&&b.qty!=='')?(+prevB.qty||0)-(+b.qty||0):null;
+            const out=b.qty!==''&&+b.qty===0;
+            return `<tr>
+            <td class="rno">${i+1}</td>
+            <td><input class="in mono" data-ltprice="${i}" data-date="${d}" value="${esc(b.price)}" placeholder="0" style="width:80px"></td>
+            <td><input class="in mono" data-ltqty="${i}" data-date="${d}" value="${esc(b.qty)}" placeholder="0" style="width:90px">
+              ${out?'<span class="rno" style="color:#D62828;margin-left:6px">OUT</span>':''}</td>
+            <td class="rno" style="${priceChanged?'color:var(--ink-3)':delta==null?'':delta>=0?'color:#157F3B':'color:#D62828'}">
+              ${priceChanged?'new ticket loaded':delta==null?'—':(delta>=0?'−':'+')+Math.abs(delta)}</td>
+            <td class="rno">$${lottoBoxValue(e,i).toFixed(2)}</td></tr>`}).join('')}
+          </tbody></table></div></div>`;
+  }
+
+  return `<div class="cards">
+      <div class="stat"><div class="k">Sold this month</div><div class="v">$${mo.sold.toFixed(2)}</div></div>
+      <div class="stat"><div class="k">Days logged</div><div class="v">${dates.filter(d=>d.startsWith(month)).length}</div></div>
+      <div class="stat"><div class="k">Days with a mismatch</div><div class="v" style="color:${mo.mismatch?'#D62828':'#157F3B'}">${mo.mismatch}</div></div>
+    </div>
+    <div class="panel"><div class="ph"><h3>Lotto machine reconciliation</h3>
+      <span class="hint">SOLD = (OPEN − CLOSE) + ADD + ONLINE · the 38 boxes' price×quantity should sum to CLOSE</span>
+      <div class="sp"></div><button class="btn sm" id="lottoCsv">Export CSV</button>
+      <button class="btn sm go" id="lottoAdd">Log a day</button></div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th style="width:120px">Date</th><th style="width:100px">Open</th><th style="width:80px">Add</th>
+        <th style="width:80px">Online</th><th style="width:100px">Close</th><th style="width:100px">Sold</th>
+        <th style="width:100px">Box total</th><th style="width:100px">Over/short</th><th style="width:90px"></th></tr></thead>
+      <tbody>${dates.length?dates.map(d=>{const e=st.lotto[d],sold=lottoSold(e),boxTotal=lottoBoxTotal(e),os=lottoOverShort(e);
+        return `<tr ${sold<0?'title="CLOSE is higher than OPEN — likely a fresh roll was loaded; check ADD for that day"':''}>
+          <td class="rno">${d}${sold<0?' ⚠':''}</td>
+          <td class="rno">${esc(e.open)||'—'}</td>
+          <td class="rno">${esc(e.add)||'—'}</td>
+          <td class="rno">${esc(e.online)||'—'}</td>
+          <td class="rno">${esc(e.close)||'—'}</td>
+          <td class="rno" style="${sold<0?'color:#D62828':''}"><b>$${sold.toFixed(2)}</b></td>
+          <td class="rno">$${boxTotal.toFixed(2)}</td>
+          <td class="rno" style="color:${osColor(os)}"><b>${os>=0?'+':''}$${os.toFixed(2)}</b></td>
+          <td><button class="btn sm" data-ltedit="${d}">Boxes</button> <button class="btn sm danger" data-ltdel="${d}">×</button></td></tr>`}).join(''):
+        '<tr><td colspan="9" style="text-align:center;color:var(--ink-3);padding:26px">No days logged yet. Click "Log a day" to start.</td></tr>'}
+      </tbody></table></div>
+    <div class="pb"><div class="note"><div><b>Reading this table.</b> Type the machine's <b>Open</b> and <b>Close</b> meter numbers for the day —
+      Close carries over as next day's Open automatically when you log a new day. <b>Add</b> is a fresh roll loaded mid-day; <b>Online</b> is any
+      online-lotto adjustment. Click <b>Boxes</b> to enter that day's 38-box quantities — their price×quantity should add up to that day's
+      Close; if it doesn't, <b>Over/short</b> flags the gap instead of it going unnoticed until month end.<br><br>
+      <b>Sold the last ticket in a box and loaded a different one?</b> On that day's Boxes screen, just change that box's <b>Price</b> to the
+      new ticket's price and set <b>Quantity</b> to what's left after any you already sold from the new roll. Put the dollar value of the
+      fresh roll you loaded into that day's <b>Add</b> field — that's what keeps Sold accurate instead of showing a false jump. Every earlier
+      day keeps the old price it actually was; changing a box's price here only affects today onward.</div></div></div></div>`;
 }
 function tabStores(st){
   return `<div class="panel"><div class="ph"><h3>Stores</h3><span class="hint">Each store has its own board, games, ads and sales</span>
@@ -1407,6 +1574,9 @@ $('#aBody').addEventListener('input',e=>{
   if(el.dataset.w){st.winners[i][el.dataset.w]=el.value;save();return}
   if(el.dataset.ac&&el.dataset.ac!=='role'){db.accounts[i][el.dataset.ac]=el.value;save();return}
   if(el.dataset.st){const s=db.stores.find(x=>x.id===el.dataset.st);if(s)s.name=el.value;save();return}
+  if(el.dataset.lt){st.lotto[el.dataset.date][el.dataset.lt]=el.value;save();return}
+  if(el.dataset.ltqty!=null){st.lotto[el.dataset.date].boxes[+el.dataset.ltqty].qty=el.value;save();return}
+  if(el.dataset.ltprice!=null){st.lotto[el.dataset.date].boxes[+el.dataset.ltprice].price=el.value;save();return}
   if(el.id==='bT'){st.brand.title=el.value;save()}
   if(el.id==='bS'){st.brand.sub=el.value;save()}
   if(el.id==='bBgVid'){st.brand.bgVideo=el.value;save()}
@@ -1418,6 +1588,7 @@ $('#aBody').addEventListener('input',e=>{
 $('#aBody').addEventListener('change',e=>{
   const st=S(),el=e.target,i=+el.dataset.i;
   if(el.dataset.flag){st.games[i][el.dataset.flag]=el.checked;save();return}
+  if(el.dataset.lt||el.dataset.ltqty!=null||el.dataset.ltprice!=null){reRender();return}  // recompute Sold/Over-short once they leave the field
   if(el.id==='bCols'){st.view.cols=el.value==='auto'?'auto':+el.value;save();reRender()}
   if(el.id==='bEmpty'){st.view.empty=el.value;save()}
   if(el.id==='bSort'){st.view.sort=el.value;save()}
@@ -1524,6 +1695,32 @@ $('#aBody').addEventListener('click',async e=>{
     const csv=rows.map(r=>r.join(',')).join('\n');
     const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
     a.download='lottery-sales.csv';a.click();URL.revokeObjectURL(a.href);toast('CSV exported');
+  }
+
+  if(b.id==='lottoAdd'){
+    st.lotto=st.lotto||{};
+    const d2=new Date().toISOString().slice(0,10);
+    if(st.lotto[d2]){toast('Today is already logged — click Boxes to edit it');return}
+    // chain from the most recent day: Open picks up where that day's Close left off, and
+    // each box's price+quantity carries forward too — a box only needs re-entry on the
+    // day its ticket actually changes; every other day it's already right
+    const prevDate=Object.keys(st.lotto).sort().reverse()[0];
+    const prev=prevDate?st.lotto[prevDate]:null;
+    st.lotto[d2]={open:prev?prev.close:'',add:'',online:'',close:'',
+      boxes:prev?prev.boxes.map(b=>({...b})):st.lottoBoxPrices.map(p=>({price:String(p),qty:''}))};
+    save();ltEditDate=d2;reRender();toast('Today added — fill in Close, then the box quantities');
+  }
+  if(d.ltedit){ltEditDate=d.ltedit;reRender()}
+  if(b.id==='ltBack'){ltEditDate=null;reRender()}
+  if(d.ltdel){if(confirm(`Remove the ${d.ltdel} lotto entry?`)){delete st.lotto[d.ltdel];if(ltEditDate===d.ltdel)ltEditDate=null;save();reRender()}}
+  if(b.id==='lottoCsv'){
+    st.lotto=st.lotto||{};
+    const rows=[['date','open','add','online','close','sold','box_total','over_short']];
+    Object.keys(st.lotto).sort().forEach(d2=>{const e=st.lotto[d2];
+      rows.push([d2,e.open||0,e.add||0,e.online||0,e.close||0,lottoSold(e).toFixed(2),lottoBoxTotal(e).toFixed(2),lottoOverShort(e).toFixed(2)])});
+    const csv=rows.map(r=>r.join(',')).join('\n');
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+    a.download='lotto-reporting.csv';a.click();URL.revokeObjectURL(a.href);toast('CSV exported');
   }
 
   if(d.up!=null){const i=+d.up;if(i>0){swapSlots(st,i,i-1);save();reRender()}}
