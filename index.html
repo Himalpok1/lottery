@@ -517,7 +517,8 @@ function ensureActiveAllowed(acc){
   if(allowed.length&&!allowed.includes(db.active)){db.active=allowed[0];local.set(db)}
 }
 function signOut(){localStorage.removeItem('ld.session');route()}
-let mem=null, SERVED=false, rev=0, pushT=null, pulling=false;
+let mem=null, SERVED=false, rev=0, pushT=null, pulling=false, dirty=false;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const local={
   get(){try{const r=localStorage.getItem(KEY);return r?JSON.parse(r):null}catch(e){return mem}},
   set(v){try{localStorage.setItem(KEY,JSON.stringify(v))}catch(e){mem=v;
@@ -574,9 +575,11 @@ function push(){
     try{
       const r=await fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},
         body:JSON.stringify({state:db})});
-      const j=await r.json();
-      if(j.rev)rev=j.rev;           // remember our own write so we don't re-pull it
-      setLink(true);
+      const j=await r.json().catch(()=>({}));
+      // fetch doesn't throw on 401/403/500 — only treat an actual accept as success,
+      // otherwise keep `dirty` so the edit is retried and the link shows offline
+      if(r.ok&&j.rev){rev=j.rev;dirty=false;setLink(true);}
+      else{setLink(false);}
     }catch(e){setLink(false)}
   },220);
 }
@@ -595,7 +598,7 @@ async function pull(){
     pulling=true;
     const r2=await fetch('/api/state',{cache:'no-store'});
     const j2=await r2.json();
-    if(j2.state){db=normalizeDb(j2.state);rev=j2.rev;local.set(db);route()}
+    syncFromServer(j2.state,j2.rev);
     setLink(true);
   }catch(e){setLink(false)}
   finally{pulling=false}
@@ -605,7 +608,7 @@ function setLink(ok){
   const col=SERVED?(ok?'#6BBF59':'#E05C5C'):'#8E97AA';
   $$('#link,[id="link"]').forEach(el=>{el.textContent=txt;el.style.color=col;});
 }
-const save=()=>{local.set(db);push();};
+const save=()=>{local.set(db);dirty=true;push();};
 
 /* ---------------- model ---------------- */
 /* Texas Lottery scratch-off catalog — pulled from texaslottery.com Games by Price Point, 13 Jul 2026.
@@ -1871,17 +1874,47 @@ setInterval(pull,1500);
 setInterval(()=>{if(!location.hash||location.hash==='#board')renderBoard()},5000);
 
 /* connect to the server if we're being served by it */
+/* Bring this device online with the server. Throws if the server is unreachable
+   (which, on Render's free tier, is exactly what a just-waking server looks like). */
+/* Reconcile this device with a freshly fetched server board. The key rule: a real
+   board always carries an owner account, while a fresh/wiped server (what Render's
+   free tier returns after it sleeps and restarts) carries none. So we never adopt a
+   blank board over a real one — we re-seed the server from whichever device still
+   has it. This is what keeps the always-on TV from going blank when the server naps. */
+function syncFromServer(state,serverRev){
+  const serverReal=state&&Array.isArray(state.accounts)&&state.accounts.length>0;
+  const weHaveReal=(db.accounts&&db.accounts.length)||(S()&&S().games.some(g=>g.name||g.no));
+  if(dirty){rev=serverRev;push();return;}                             // our offline edits win
+  if(serverReal){db=normalizeDb(state);rev=serverRev;local.set(db);route();return;}  // adopt live board
+  if(weHaveReal){rev=serverRev;dirty=true;push();return;}             // wiped server -> re-seed from us
+  if(state){db=normalizeDb(state);rev=serverRev;local.set(db);route();}  // both blank: nothing to lose
+}
+async function connect(){
+  const r=await fetch('/api/state',{cache:'no-store'});
+  if(!r.ok)throw 0;
+  const j=await r.json();
+  SERVED=true;
+  syncFromServer(j.state,j.rev||0);
+  setLink(true);
+  loadDraws();
+}
+/* If the server is asleep it can take up to a minute to answer, or fail outright.
+   Retry through that instead of dropping to local-only on the first miss; if it's
+   still down, keep probing in the background so we self-heal the moment it wakes. */
+function reconnectLoop(){
+  const tick=async()=>{
+    if(SERVED)return;
+    try{await connect()}catch(e){setLink(false);setTimeout(tick,6000)}
+  };
+  setTimeout(tick,6000);
+}
 (async function boot(){
-  try{
-    const r=await fetch('/api/state',{cache:'no-store'});
-    if(!r.ok)throw 0;
-    const j=await r.json();
-    SERVED=true;rev=j.rev||0;
-    if(j.state&&j.state.stores&&j.state.stores.length){db=normalizeDb(j.state);local.set(db)}
-    else{push()}                       // first run: seed the server from this browser
-    route();setLink(true);
-    loadDraws();
-  }catch(e){SERVED=false;setLink(false)}
+  for(let attempt=0;attempt<10;attempt++){
+    try{await connect();return}
+    catch(e){setLink(false);await sleep(Math.min(6000,700*(attempt+1)))}
+  }
+  SERVED=false;setLink(false);route();  // run local-only for now…
+  reconnectLoop();                       // …but keep trying to come online
 })();
 
 let idle;const wake=()=>{$('#chrome').classList.remove('idle');clearTimeout(idle);
