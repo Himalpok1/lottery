@@ -776,16 +776,22 @@ const normalizeDb=d=>{
     // Boxes mirror the 40 game slots 1-to-1 (box i IS slot i, priced from the Games tab).
     // A day is now {shifts:[…]}. Migrate older shapes: a flat single-day entry becomes one
     // shift; 38-box / bare-qty arrays get carried across by index and padded to 40.
-    const fixBoxes=(ob,oq)=>Array.from({length:40},(_,i)=>({qty:ob&&ob[i]?String(ob[i].qty??''):(oq?String(oq[i]||''):'')}));
+    // each box snapshots its game+price (so a swapped-in book keeps its own price) plus
+    // the quantity left; a shift also holds staged newBooks for the next shift/day
+    const gn=i=>String((s.games[i]||{}).name||''),gp=i=>String((s.games[i]||{}).price||'');
+    const fixBoxes=(ob,oq)=>Array.from({length:40},(_,i)=>{const b=(ob&&ob[i])||{};
+      return {game:(b.game!==undefined&&b.game!=='')?String(b.game):gn(i),price:(b.price!==undefined&&b.price!=='')?String(b.price):gp(i),
+        qty:b.qty!==undefined?String(b.qty??''):(oq?String(oq[i]||''):'')}});
     Object.values(s.lotto).forEach(e=>{
       if(!Array.isArray(e.shifts)){
         const sh={clerk:'',open:e.open??'',openAuto:e.openAuto,add:e.add??'',online:e.online??'',close:e.close??'',closeAuto:e.closeAuto,
-          boxes:fixBoxes(Array.isArray(e.boxes)?e.boxes:null,Array.isArray(e.qty)?e.qty:null)};
+          boxes:fixBoxes(Array.isArray(e.boxes)?e.boxes:null,Array.isArray(e.qty)?e.qty:null),newBooks:[]};
         e.shifts=[sh];
         ['open','openAuto','add','online','close','closeAuto','boxes','qty'].forEach(k=>delete e[k]);
       }
       e.shifts.forEach(sh=>{
         if(typeof sh.clerk!=='string')sh.clerk='';
+        if(!Array.isArray(sh.newBooks))sh.newBooks=[];
         sh.boxes=fixBoxes(Array.isArray(sh.boxes)?sh.boxes:null,null);
       });
     });
@@ -1352,7 +1358,9 @@ function tabSales(st){
 /* ---- box + shift math. A "shift" holds {clerk,open,openAuto,add,online,close,closeAuto,boxes[]};
    a day is {shifts:[…]} — one shift by default, two when the store splits the day. ---- */
 const boxPrice=i=>+((S().games[i]||{}).price)||0;
-const lottoBoxValue=(sh,i)=>boxPrice(i)*(+((sh.boxes||[])[i]||{}).qty||0);
+/* a box values at its own snapshot price × quantity left; snapshot defaults to the Games
+   slot price but a swapped-in book keeps the price it was loaded at */
+const lottoBoxValue=(sh,i)=>{const b=(sh.boxes||[])[i]||{};const p=(b.price!==undefined&&b.price!=='')?+b.price:boxPrice(i);return (p||0)*(+b.qty||0)};
 const lottoBoxTotal=sh=>(sh.boxes||[]).reduce((a,_,i)=>i<slotCount()?a+lottoBoxValue(sh,i):a,0);
 /* Close auto-fills from the box total unless typed over (closeAuto===false) */
 const effClose=sh=>sh.closeAuto===true?lottoBoxTotal(sh):(+sh.close||0);
@@ -1374,7 +1382,18 @@ function lottoTimeline(st){const out=[];Object.keys(st.lotto||{}).sort().forEach
 function syncLottoChain(st){const tl=lottoTimeline(st);for(let k=1;k<tl.length;k++){if(tl[k].openAuto!==false)tl[k].open=effClose(tl[k-1]).toFixed(2)}}
 const lottoShiftCount=st=>Math.min(2,Math.max(1,+(((st||S()).view||{}).lottoShifts)||1));
 const lottoShiftName=(st,i)=>{const nm=((st||S()).view||{}).lottoShiftNames;return (Array.isArray(nm)&&nm[i]&&String(nm[i]).trim())?nm[i]:('Shift '+(i+1))};
-const makeShift=()=>({clerk:'',open:'',openAuto:true,add:'',online:'',close:'',closeAuto:true,boxes:Array.from({length:40},()=>({qty:''}))});
+const makeShift=()=>({clerk:'',open:'',openAuto:true,add:'',online:'',close:'',closeAuto:true,boxes:Array.from({length:40},(_,i)=>({game:String((S().games[i]||{}).name||''),price:String((S().games[i]||{}).price||''),qty:''})),newBooks:[]});
+const lottoNbRow=(sh,r)=>{sh.newBooks=sh.newBooks||[];while(sh.newBooks.length<=r)sh.newBooks.push({slot:'',no:''});return sh.newBooks[r]};
+/* promote a shift's staged new books into the next shift: swap the slot's game on the
+   board, and start that box's fresh book (its quantity gets counted next shift) */
+function promoteNewBooks(st,fromShift,toShift){
+  (fromShift.newBooks||[]).forEach(nb=>{
+    const slot=+nb.slot;if(!slot||slot<1||slot>40||!nb.no)return;const idx=slot-1;
+    const g=TX.find(x=>String(x.no)===String(nb.no));
+    if(g){const s=st.games[idx];s.no=g.no;s.name=g.name;s.price=String(g.price);s.img=g.img;s.isNew=g.isNew;s.isLucky=g.feat;s.closing=!!g.closing;s.endDate=g.endDate||'';s.current='';s.status=''}
+    toShift.boxes[idx]={game:String(g?g.name:((st.games[idx]||{}).name||'')),price:String((g?+g.price:boxPrice(idx))||''),qty:''};
+  });
+}
 let ltEditDate=null;
 function shiftEditor(st,d,day,si,prevBoxes){
   const n=slotCount(st),sh=day.shifts[si],multi=day.shifts.length>1||lottoShiftCount(st)>1;
@@ -1399,12 +1418,25 @@ function shiftEditor(st,d,day,si,prevBoxes){
       <thead><tr><th style="width:50px">Box</th><th>Game</th><th style="width:70px">Price</th><th style="width:110px">Quantity</th><th style="width:120px">Sold</th><th style="width:110px">Value</th></tr></thead>
       <tbody>${sh.boxes.slice(0,n).map((b,i)=>{const g=st.games[i]||{};const prevB=prevBoxes?prevBoxes[i]:null;
         const delta=(prevB&&prevB.qty!==''&&b.qty!=='')?(+prevB.qty||0)-(+b.qty||0):null;const out=b.qty!==''&&+b.qty===0;
-        return `<tr><td class="rno">${i+1}</td><td>${g.name?esc(g.name):'<span style="color:var(--ink-3)">— empty slot —</span>'}</td>
-          <td class="rno">${g.price!==''&&g.price!=null?'$'+esc(g.price):'—'}</td>
+        return `<tr><td class="rno">${i+1}</td><td>${b.game?esc(b.game):(g.name?esc(g.name):'<span style="color:var(--ink-3)">— empty slot —</span>')}</td>
+          <td class="rno">${(b.price!==undefined&&b.price!=='')?'$'+esc(b.price):(g.price!==''&&g.price!=null?'$'+esc(g.price):'—')}</td>
           <td><input class="in mono" data-ltqty="${i}" data-shift="${si}" data-date="${d}" value="${esc(b.qty)}" placeholder="0" style="width:90px">${out?'<span class="rno" style="color:#D62828;margin-left:6px">OUT</span>':''}</td>
           <td class="rno" style="${delta==null?'':delta>0?'color:#157F3B':delta<0?'color:#B8860B':''}">${delta==null?'—':delta===0?'0':(delta>0?delta+' sold':'+'+Math.abs(delta)+' added')}</td>
           <td class="rno">$${lottoBoxValue(sh,i).toFixed(2)}</td></tr>`}).join('')}
-      </tbody></table></div></div></div>`;
+      </tbody></table></div>
+    <div style="margin-top:12px"><div class="rno" style="color:var(--ink-3);margin-bottom:6px">NEW BOOKS LOADED — each takes over its slot at the next shift or day</div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th style="width:64px">Slot</th><th>New game (from catalog)</th><th style="width:70px"></th></tr></thead>
+        <tbody>${Array.from({length:4},(_,r)=>{const row=(sh.newBooks||[])[r]||{};
+          return `<tr>
+            <td><input class="in mono" data-ltnbslot="${r}" data-shift="${si}" data-date="${d}" value="${esc(row.slot||'')}" placeholder="#" style="width:52px"></td>
+            <td><select class="in mono" data-ltnbno="${r}" data-shift="${si}" data-date="${d}" style="width:260px;font-size:12px">
+              <option value="">— pick the new book's game —</option>
+              ${(TX&&TX.length?TX:[]).map(t=>`<option value="${esc(t.no)}" ${String(row.no)===String(t.no)?'selected':''}>${esc(t.no)} · ${esc((t.name||'').slice(0,22))} ($${t.price})</option>`).join('')}
+            </select></td>
+            <td>${row.no?'<span class="rno" style="color:#157F3B">staged</span>':''}</td></tr>`}).join('')}
+        </tbody></table></div></div>
+    </div></div>`;
 }
 function tabLotto(st){
   st.lotto=st.lotto||{};
@@ -1668,6 +1700,7 @@ $('#aBody').addEventListener('input',e=>{
   if(el.dataset.lt){const sh=st.lotto[el.dataset.date].shifts[+el.dataset.shift];sh[el.dataset.lt]=el.value;if(el.dataset.lt==='close')sh.closeAuto=false;if(el.dataset.lt==='open')sh.openAuto=false;save();return}
   if(el.dataset.ltqty!=null){st.lotto[el.dataset.date].shifts[+el.dataset.shift].boxes[+el.dataset.ltqty].qty=el.value;save();return}
   if(el.dataset.ltclerk!=null){st.lotto[el.dataset.date].shifts[+el.dataset.ltclerk].clerk=el.value;save();return}
+  if(el.dataset.ltnbslot!=null){lottoNbRow(st.lotto[el.dataset.date].shifts[+el.dataset.shift],+el.dataset.ltnbslot).slot=el.value;save();return}
   if(el.id==='bT'){st.brand.title=el.value;save()}
   if(el.id==='bS'){st.brand.sub=el.value;save()}
   if(el.id==='bBgVid'){st.brand.bgVideo=el.value;save()}
@@ -1681,6 +1714,7 @@ $('#aBody').addEventListener('change',e=>{
   if(el.dataset.flag){st.games[i][el.dataset.flag]=el.checked;save();return}
   if(el.dataset.stock!=null){st.games[+el.dataset.stock].status=el.value;save();reRender();return}
   if(el.dataset.lt||el.dataset.ltqty!=null){syncLottoChain(S());save();reRender();return}  // recompute Sold/Over-short + carry Close→next Open once they leave the field
+  if(el.dataset.ltnbno!=null){lottoNbRow(st.lotto[el.dataset.date].shifts[+el.dataset.shift],+el.dataset.ltnbno).no=el.value;save();reRender();return}
   if(el.id==='ltShifts'){st.view.lottoShifts=Math.min(2,Math.max(1,+el.value||1));save();reRender();return}
   if(el.id==='ltName0'||el.id==='ltName1'){if(!Array.isArray(st.view.lottoShiftNames))st.view.lottoShiftNames=['Shift 1','Shift 2'];st.view.lottoShiftNames[el.id==='ltName0'?0:1]=el.value;save();reRender();return}
   if(el.id==='bSlots'){st.view.slots=Math.min(40,Math.max(1,+el.value||40));save();reRender()}
@@ -1802,14 +1836,17 @@ $('#aBody').addEventListener('click',async e=>{
     const prevDate=Object.keys(st.lotto).sort().reverse()[0];
     const prevLast=prevDate?dayLast(st.lotto[prevDate]):null;
     const shifts=[];for(let k=0;k<lottoShiftCount(st);k++)shifts.push(makeShift());
-    if(prevLast)shifts[0].boxes=prevLast.boxes.map(b=>({qty:String(b.qty??'')}));
+    if(prevLast){
+      shifts[0].boxes=prevLast.boxes.map(b=>({game:String(b.game??''),price:String(b.price??''),qty:String(b.qty??'')}));
+      promoteNewBooks(st,prevLast,shifts[0]);  // books staged yesterday take over their slots today
+    }
     st.lotto[d2]={shifts};syncLottoChain(st);
     save();ltEditDate=d2;reRender();toast('Today added — enter the box quantities; Close fills in from their total');
   }
   if(d.ltedit){ltEditDate=d.ltedit;reRender()}
   if(d.ltcloseauto!=null&&d.date){const sh=st.lotto[d.date].shifts[+d.ltcloseauto];if(sh){sh.closeAuto=true;sh.close='';syncLottoChain(st);save();reRender()}}
   if(d.ltopenauto!=null&&d.date){const sh=st.lotto[d.date].shifts[+d.ltopenauto];if(sh){sh.openAuto=true;syncLottoChain(st);save();reRender()}}
-  if(d.ltaddshift){const day=st.lotto[d.ltaddshift];if(day&&day.shifts.length<2){day.shifts.push(makeShift());syncLottoChain(st);save();reRender()}}
+  if(d.ltaddshift){const day=st.lotto[d.ltaddshift];if(day&&day.shifts.length<2){const prev=day.shifts[day.shifts.length-1];const ns=makeShift();ns.boxes=prev.boxes.map(b=>({game:String(b.game??''),price:String(b.price??''),qty:String(b.qty??'')}));promoteNewBooks(st,prev,ns);day.shifts.push(ns);syncLottoChain(st);save();reRender()}}
   if(d.ltdelshift!=null&&d.date){const day=st.lotto[d.date];if(day&&day.shifts.length>1){day.shifts.splice(+d.ltdelshift,1);syncLottoChain(st);save();reRender()}}
   if(b.id==='ltBack'){ltEditDate=null;reRender()}
   if(d.ltdel){if(confirm(`Remove the ${d.ltdel} lotto entry?`)){delete st.lotto[d.ltdel];if(ltEditDate===d.ltdel)ltEditDate=null;save();reRender()}}
