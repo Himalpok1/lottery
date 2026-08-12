@@ -771,15 +771,16 @@ const normalizeDb=d=>{
   (d.stores||[]).forEach(s=>{
     (s.games||[]).forEach(g=>{if(typeof g.status!=='string')g.status=''});  // stock override added later
     if(!s.lotto||typeof s.lotto!=='object')s.lotto={};
-    if(!Array.isArray(s.lottoBoxPrices)||s.lottoBoxPrices.length!==38)s.lottoBoxPrices=[...LOTTO_BOX_PRICES];
-    // each day keeps its own {price,qty} per box now, not one store-wide price list —
-    // migrate anything from the older shape (a bare qty array) using today's prices,
-    // which is the best guess available for data saved before this changed
+    // Boxes now mirror the 40 game slots 1-to-1: box i IS slot i, and its price is the
+    // Games-tab price for that slot (not stored per box). Each day records only the
+    // quantity left in each of the 40 boxes. Migrate any older shape (38 boxes, or a
+    // bare qty array) by carrying quantities across by index and padding to 40.
     Object.values(s.lotto).forEach(e=>{
-      if(!Array.isArray(e.boxes)||e.boxes.length!==38){
-        const oldQty=Array.isArray(e.qty)?e.qty:null;
-        e.boxes=s.lottoBoxPrices.map((p,i)=>({price:String(p),qty:oldQty?String(oldQty[i]||''):''}));
-      }
+      const oldBoxes=Array.isArray(e.boxes)?e.boxes:null;
+      const oldQty=Array.isArray(e.qty)?e.qty:null;
+      e.boxes=Array.from({length:40},(_,i)=>({
+        qty: oldBoxes&&oldBoxes[i]?String(oldBoxes[i].qty??'') : (oldQty?String(oldQty[i]||''):'')
+      }));
       delete e.qty;
     });
   });
@@ -1336,7 +1337,9 @@ function tabSales(st){
    $20 roll in its place). Each day snapshots its own {price, qty} per box, seeded from
    the day before, so swapping a box's ticket only affects today onward: yesterday's
    record still shows the $50 price it actually was, it doesn't get silently rewritten. */
-const lottoBoxValue=(e,i)=>{const b=(e.boxes||[])[i]||{};return(+b.price||0)*(+b.qty||0)};
+/* a box's price is its matching Games slot's price — locked to the board, not stored */
+const boxPrice=i=>+((S().games[i]||{}).price)||0;
+const lottoBoxValue=(e,i)=>boxPrice(i)*(+((e.boxes||[])[i]||{}).qty||0);
 const lottoBoxTotal=e=>(e.boxes||[]).reduce((a,_,i)=>a+lottoBoxValue(e,i),0);
 const lottoSold=e=>(+e.open||0)-(+e.close||0)+(+e.add||0)+(+e.online||0);
 const lottoOverShort=e=>lottoBoxTotal(e)-(+e.close||0);
@@ -1356,7 +1359,7 @@ function tabLotto(st){
     const prevDate=Object.keys(st.lotto).filter(x=>x<d).sort().reverse()[0];
     const prevBoxes=prevDate?st.lotto[prevDate].boxes:null;
     return `<div class="panel"><div class="ph">
-        <h3>${d}</h3><span class="hint">Machine meter, then the 38-box breakdown</span>
+        <h3>${d}</h3><span class="hint">Machine meter, then the 40 boxes — one per Games slot, in the same order</span>
         <div class="sp"></div><button class="btn sm" id="ltBack">← Back to all days</button></div>
       <div class="pb"><div class="fields">
         <div class="f"><label>Open</label><input class="in mono" data-lt="open" data-date="${d}" value="${esc(e.open)}" style="width:110px"></div>
@@ -1369,23 +1372,24 @@ function tabLotto(st){
       </div></div></div>
 
       <div class="panel"><div class="ph"><h3>Boxes</h3>
-        <span class="hint">${prevDate?`Compared against ${prevDate}. A box's price only changes here, on the day you actually swap its ticket — past days keep their own recorded price.`:'Price and quantity left in each box, as of today'}</span>
+        <span class="hint">Boxes 1–40 match your Games slots exactly. Price comes from the Games tab; just enter how many tickets are left in each box.${prevDate?` Change is vs ${prevDate}.`:''}</span>
         </div>
         <div style="overflow-x:auto"><table>
-          <thead><tr><th style="width:60px">Box</th><th style="width:90px">Price</th><th style="width:110px">Quantity</th>
-            <th style="width:130px">${prevDate?'Change':''}</th><th style="width:110px">Value</th></tr></thead>
+          <thead><tr><th style="width:50px">Box</th><th>Game</th><th style="width:70px">Price</th><th style="width:110px">Quantity</th>
+            <th style="width:120px">${prevDate?'Sold':''}</th><th style="width:110px">Value</th></tr></thead>
           <tbody>${e.boxes.map((b,i)=>{
+            const g=st.games[i]||{};
             const prevB=prevBoxes?prevBoxes[i]:null;
-            const priceChanged=prevB&&prevB.price!==''&&b.price!==''&&+prevB.price!==+b.price;
-            const delta=(!priceChanged&&prevB&&prevB.qty!==''&&b.qty!=='')?(+prevB.qty||0)-(+b.qty||0):null;
+            const delta=(prevB&&prevB.qty!==''&&b.qty!=='')?(+prevB.qty||0)-(+b.qty||0):null;
             const out=b.qty!==''&&+b.qty===0;
             return `<tr>
             <td class="rno">${i+1}</td>
-            <td><input class="in mono" data-ltprice="${i}" data-date="${d}" value="${esc(b.price)}" placeholder="0" style="width:80px"></td>
+            <td>${g.name?esc(g.name):'<span style="color:var(--ink-3)">— empty slot —</span>'}</td>
+            <td class="rno">${g.price!==''&&g.price!=null?'$'+esc(g.price):'—'}</td>
             <td><input class="in mono" data-ltqty="${i}" data-date="${d}" value="${esc(b.qty)}" placeholder="0" style="width:90px">
               ${out?'<span class="rno" style="color:#D62828;margin-left:6px">OUT</span>':''}</td>
-            <td class="rno" style="${priceChanged?'color:var(--ink-3)':delta==null?'':delta>=0?'color:#157F3B':'color:#D62828'}">
-              ${priceChanged?'new ticket loaded':delta==null?'—':(delta>=0?'−':'+')+Math.abs(delta)}</td>
+            <td class="rno" style="${delta==null?'':delta>0?'color:#157F3B':delta<0?'color:#B8860B':''}">
+              ${delta==null?'—':delta===0?'0':(delta>0?delta+' sold':'+'+Math.abs(delta)+' added')}</td>
             <td class="rno">$${lottoBoxValue(e,i).toFixed(2)}</td></tr>`}).join('')}
           </tbody></table></div></div>`;
   }
@@ -1396,7 +1400,7 @@ function tabLotto(st){
       <div class="stat"><div class="k">Days with a mismatch</div><div class="v" style="color:${mo.mismatch?'#D62828':'#157F3B'}">${mo.mismatch}</div></div>
     </div>
     <div class="panel"><div class="ph"><h3>Lotto machine reconciliation</h3>
-      <span class="hint">SOLD = (OPEN − CLOSE) + ADD + ONLINE · the 38 boxes' price×quantity should sum to CLOSE</span>
+      <span class="hint">SOLD = (OPEN − CLOSE) + ADD + ONLINE · the 40 boxes' price×quantity should sum to CLOSE</span>
       <div class="sp"></div><button class="btn sm" id="lottoCsv">Export CSV</button>
       <button class="btn sm go" id="lottoAdd">Log a day</button></div>
     <div style="overflow-x:auto"><table>
@@ -1418,12 +1422,11 @@ function tabLotto(st){
       </tbody></table></div>
     <div class="pb"><div class="note"><div><b>Reading this table.</b> Type the machine's <b>Open</b> and <b>Close</b> meter numbers for the day —
       Close carries over as next day's Open automatically when you log a new day. <b>Add</b> is a fresh roll loaded mid-day; <b>Online</b> is any
-      online-lotto adjustment. Click <b>Boxes</b> to enter that day's 38-box quantities — their price×quantity should add up to that day's
-      Close; if it doesn't, <b>Over/short</b> flags the gap instead of it going unnoticed until month end.<br><br>
-      <b>Sold the last ticket in a box and loaded a different one?</b> On that day's Boxes screen, just change that box's <b>Price</b> to the
-      new ticket's price and set <b>Quantity</b> to what's left after any you already sold from the new roll. Put the dollar value of the
-      fresh roll you loaded into that day's <b>Add</b> field — that's what keeps Sold accurate instead of showing a false jump. Every earlier
-      day keeps the old price it actually was; changing a box's price here only affects today onward.</div></div></div></div>`;
+      online-lotto adjustment. Click <b>Boxes</b> to enter that day's quantities for boxes <b>1–40</b> — the same slots, in the same order, as
+      your Games tab. Each box's price is taken straight from the Games tab, so price×quantity should add up to that day's Close; if it
+      doesn't, <b>Over/short</b> flags the gap instead of it going unnoticed until month end.<br><br>
+      <b>Changed the ticket in a box?</b> Update that slot's price on the <b>Games</b> tab — the box here follows it automatically. Put the
+      dollar value of any fresh roll you loaded into that day's <b>Add</b> field so Sold stays accurate instead of showing a false jump.</div></div></div></div>`;
 }
 function tabStores(st){
   return `<div class="panel"><div class="ph"><h3>Stores</h3><span class="hint">Each store has its own board, games, ads and sales</span>
@@ -1748,12 +1751,12 @@ $('#aBody').addEventListener('click',async e=>{
     const d2=new Date().toISOString().slice(0,10);
     if(st.lotto[d2]){toast('Today is already logged — click Boxes to edit it');return}
     // chain from the most recent day: Open picks up where that day's Close left off, and
-    // each box's price+quantity carries forward too — a box only needs re-entry on the
-    // day its ticket actually changes; every other day it's already right
+    // each box's quantity carries forward from yesterday as a starting point; prices
+    // always come live from the Games tab, so there's nothing per-box to seed there
     const prevDate=Object.keys(st.lotto).sort().reverse()[0];
     const prev=prevDate?st.lotto[prevDate]:null;
     st.lotto[d2]={open:prev?prev.close:'',add:'',online:'',close:'',
-      boxes:prev?prev.boxes.map(b=>({...b})):st.lottoBoxPrices.map(p=>({price:String(p),qty:''}))};
+      boxes:Array.from({length:40},(_,i)=>({qty:prev&&prev.boxes[i]?String(prev.boxes[i].qty??''):''}))};
     save();ltEditDate=d2;reRender();toast('Today added — fill in Close, then the box quantities');
   }
   if(d.ltedit){ltEditDate=d.ltedit;reRender()}
