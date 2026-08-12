@@ -1347,8 +1347,11 @@ function tabSales(st){
 const boxPrice=i=>+((S().games[i]||{}).price)||0;
 const lottoBoxValue=(e,i)=>boxPrice(i)*(+((e.boxes||[])[i]||{}).qty||0);
 const lottoBoxTotal=e=>(e.boxes||[]).reduce((a,_,i)=>i<slotCount()?a+lottoBoxValue(e,i):a,0);
-const lottoSold=e=>(+e.open||0)-(+e.close||0)+(+e.add||0)+(+e.online||0);
-const lottoOverShort=e=>lottoBoxTotal(e)-(+e.close||0);
+/* Close auto-fills from the box total (boxes 1–N) unless the owner has typed over it.
+   closeAuto===true → use the live box total; otherwise use the number they entered. */
+const effClose=e=>e.closeAuto===true?lottoBoxTotal(e):(+e.close||0);
+const lottoSold=e=>(+e.open||0)-effClose(e)+(+e.add||0)+(+e.online||0);
+const lottoOverShort=e=>lottoBoxTotal(e)-effClose(e);
 let ltEditDate=null;
 function tabLotto(st){
   st.lotto=st.lotto||{};
@@ -1372,7 +1375,7 @@ function tabLotto(st){
         <div class="f"><label>Open</label><input class="in mono" data-lt="open" data-date="${d}" value="${esc(e.open)}" style="width:110px"></div>
         <div class="f"><label>Add</label><input class="in mono" data-lt="add" data-date="${d}" value="${esc(e.add)}" style="width:90px"></div>
         <div class="f"><label>Online</label><input class="in mono" data-lt="online" data-date="${d}" value="${esc(e.online)}" style="width:90px"></div>
-        <div class="f"><label>Close</label><input class="in mono" data-lt="close" data-date="${d}" value="${esc(e.close)}" style="width:110px"></div>
+        <div class="f"><label>Close ${e.closeAuto===true?'<span class="rno" style="color:#157F3B">auto</span>':`<button class="btn sm" data-ltcloseauto="${d}" title="Set Close back to the box total" style="padding:0 6px;line-height:1.4">↻ box total</button>`}</label><input class="in mono" data-lt="close" data-date="${d}" value="${e.closeAuto===true?boxTotal.toFixed(2):esc(e.close)}" style="width:110px${e.closeAuto===true?';background:var(--sf-2)':''}"></div>
         <div class="f"><label>Sold</label><div class="in mono" style="width:110px;background:var(--sf-2);${sold<0?'color:#D62828':''}"><b>$${sold.toFixed(2)}</b></div></div>
         <div class="f"><label>Box total</label><div class="in mono" style="width:110px;background:var(--sf-2)"><b>$${boxTotal.toFixed(2)}</b></div></div>
         <div class="f"><label>Over/short</label><div class="in mono" style="width:110px;background:var(--sf-2);color:${osColor(os)}"><b>${os>=0?'+':''}$${os.toFixed(2)}</b></div></div>
@@ -1420,18 +1423,17 @@ function tabLotto(st){
           <td class="rno">${esc(e.open)||'—'}</td>
           <td class="rno">${esc(e.add)||'—'}</td>
           <td class="rno">${esc(e.online)||'—'}</td>
-          <td class="rno">${esc(e.close)||'—'}</td>
+          <td class="rno">${e.closeAuto===true?'$'+effClose(e).toFixed(2):(esc(e.close)||'—')}</td>
           <td class="rno" style="${sold<0?'color:#D62828':''}"><b>$${sold.toFixed(2)}</b></td>
           <td class="rno">$${boxTotal.toFixed(2)}</td>
           <td class="rno" style="color:${osColor(os)}"><b>${os>=0?'+':''}$${os.toFixed(2)}</b></td>
           <td><button class="btn sm" data-ltedit="${d}">Boxes</button> <button class="btn sm danger" data-ltdel="${d}">×</button></td></tr>`}).join(''):
         '<tr><td colspan="9" style="text-align:center;color:var(--ink-3);padding:26px">No days logged yet. Click "Log a day" to start.</td></tr>'}
       </tbody></table></div>
-    <div class="pb"><div class="note"><div><b>Reading this table.</b> Type the machine's <b>Open</b> and <b>Close</b> meter numbers for the day —
-      Close carries over as next day's Open automatically when you log a new day. <b>Add</b> is a fresh roll loaded mid-day; <b>Online</b> is any
-      online-lotto adjustment. Click <b>Boxes</b> to enter that day's quantities for boxes <b>1–${slotCount(st)}</b> — the same slots, in the same order, as
-      your Games tab. Each box's price is taken straight from the Games tab, so price×quantity should add up to that day's Close; if it
-      doesn't, <b>Over/short</b> flags the gap instead of it going unnoticed until month end.<br><br>
+    <div class="pb"><div class="note"><div><b>Reading this table.</b> <b>Open</b> is where the day starts (it carries over from yesterday's Close). Click <b>Boxes</b>
+      to enter that day's quantities for boxes <b>1–${slotCount(st)}</b> — the same slots, in the same order, as your Games tab, priced from the Games tab.
+      <b>Close</b> then fills in automatically as the total of those boxes (price × quantity). <b>Add</b> is a fresh roll loaded mid-day; <b>Online</b> is any
+      online-lotto adjustment. Want to reconcile against the machine's own meter instead? Just type over <b>Close</b> and <b>Over/short</b> flags any gap.<br><br>
       <b>Changed the ticket in a box?</b> Update that slot's price on the <b>Games</b> tab — the box here follows it automatically. Put the
       dollar value of any fresh roll you loaded into that day's <b>Add</b> field so Sold stays accurate instead of showing a false jump.</div></div></div></div>`;
 }
@@ -1629,7 +1631,7 @@ $('#aBody').addEventListener('input',e=>{
   if(el.dataset.w){st.winners[i][el.dataset.w]=el.value;save();return}
   if(el.dataset.ac&&el.dataset.ac!=='role'){db.accounts[i][el.dataset.ac]=el.value;save();return}
   if(el.dataset.st){const s=db.stores.find(x=>x.id===el.dataset.st);if(s)s.name=el.value;save();return}
-  if(el.dataset.lt){st.lotto[el.dataset.date][el.dataset.lt]=el.value;save();return}
+  if(el.dataset.lt){const ee=st.lotto[el.dataset.date];ee[el.dataset.lt]=el.value;if(el.dataset.lt==='close')ee.closeAuto=false;save();return}
   if(el.dataset.ltqty!=null){st.lotto[el.dataset.date].boxes[+el.dataset.ltqty].qty=el.value;save();return}
   if(el.dataset.ltprice!=null){st.lotto[el.dataset.date].boxes[+el.dataset.ltprice].price=el.value;save();return}
   if(el.id==='bT'){st.brand.title=el.value;save()}
@@ -1763,18 +1765,19 @@ $('#aBody').addEventListener('click',async e=>{
     // always come live from the Games tab, so there's nothing per-box to seed there
     const prevDate=Object.keys(st.lotto).sort().reverse()[0];
     const prev=prevDate?st.lotto[prevDate]:null;
-    st.lotto[d2]={open:prev?prev.close:'',add:'',online:'',close:'',
+    st.lotto[d2]={open:prev?String(effClose(prev).toFixed(2)):'',add:'',online:'',close:'',closeAuto:true,
       boxes:Array.from({length:40},(_,i)=>({qty:prev&&prev.boxes[i]?String(prev.boxes[i].qty??''):''}))};
-    save();ltEditDate=d2;reRender();toast('Today added — fill in Close, then the box quantities');
+    save();ltEditDate=d2;reRender();toast('Today added — enter the box quantities; Close fills in from their total');
   }
   if(d.ltedit){ltEditDate=d.ltedit;reRender()}
+  if(d.ltcloseauto){const ee=st.lotto[d.ltcloseauto];if(ee){ee.closeAuto=true;ee.close='';save();reRender()}}
   if(b.id==='ltBack'){ltEditDate=null;reRender()}
   if(d.ltdel){if(confirm(`Remove the ${d.ltdel} lotto entry?`)){delete st.lotto[d.ltdel];if(ltEditDate===d.ltdel)ltEditDate=null;save();reRender()}}
   if(b.id==='lottoCsv'){
     st.lotto=st.lotto||{};
     const rows=[['date','open','add','online','close','sold','box_total','over_short']];
     Object.keys(st.lotto).sort().forEach(d2=>{const e=st.lotto[d2];
-      rows.push([d2,e.open||0,e.add||0,e.online||0,e.close||0,lottoSold(e).toFixed(2),lottoBoxTotal(e).toFixed(2),lottoOverShort(e).toFixed(2)])});
+      rows.push([d2,e.open||0,e.add||0,e.online||0,effClose(e).toFixed(2),lottoSold(e).toFixed(2),lottoBoxTotal(e).toFixed(2),lottoOverShort(e).toFixed(2)])});
     const csv=rows.map(r=>r.join(',')).join('\n');
     const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
     a.download='lotto-reporting.csv';a.click();URL.revokeObjectURL(a.href);toast('CSV exported');
