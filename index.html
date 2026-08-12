@@ -757,7 +757,7 @@ const newStore=(name)=>({
   id:'s'+Math.random().toString(36).slice(2,8),name,
   brand:{title:name,sub:'Scratch-Offs',logo:'',theme:'texas',accent:'#D62828',
          bgType:'theme',bgImage:'',bgVideo:''},
-  view:{cols:'auto',empty:'show',sort:'slot',endingAt:3,tile:'card',showJp:true,showDraws:true,showAds:true,showWinners:true,adSecs:8},
+  view:{cols:'auto',empty:'show',sort:'slot',endingAt:3,tile:'card',slots:40,showJp:true,showDraws:true,showAds:true,showWinners:true,adSecs:8},
   games:blankGames(),ads:[],jackpots:[],winners:[],sales:{},lotto:{},lottoBoxPrices:[...LOTTO_BOX_PRICES],feedUrl:''
 });
 const fresh=()=>{const s=newStore('Swing by Maypearl');return{stores:[s],active:s.id,
@@ -809,8 +809,12 @@ function recommended(games){
 function recSlots(games,at){ // healthy stock + prizes still out there
   return games.filter(g=>filled(g)&&+g.prizesLeft>+at).slice(0,10).map(g=>g.slot);
 }
+/* how many of the 40 slots the store actually uses — the rest stay in storage
+   (so lowering the count never deletes a game) but are hidden everywhere */
+const slotCount=st=>Math.min(40,Math.max(1,+((st||S()).view||{}).slots||40));
 function shownGames(st){
-  let g=st.games.filter(x=>st.view.empty==='hide'?filled(x):true);
+  const n=slotCount(st);
+  let g=st.games.filter(x=>+x.slot<=n).filter(x=>st.view.empty==='hide'?filled(x):true);
   if(st.view.sort==='num')g=[...g].sort((a,b)=>(+a.no||9e9)-(+b.no||9e9));
   if(st.view.sort==='price')g=[...g].sort((a,b)=>(+a.price||9e9)-(+b.price||9e9)||(+a.slot)-(+b.slot));
   return g;
@@ -1132,22 +1136,23 @@ function renderAdmin(){
     sales:tabSales,lotto:tabLotto,stores:tabStores,data:tabData}[aTab]||tabGames)(st);
 }
 function tabGames(st){
+  const n=slotCount(st);
   return `<div class="panel">
-    <div class="ph"><h3>The 40 games</h3>
+    <div class="ph"><h3>The ${n} games</h3>
       <span class="hint">Game no. + name + price + picture. "Prizes left" drives ONLY N LEFT; "Current" is the ticket you're on in the pack.</span>
-      <div class="sp"></div><span class="hint" style="color:var(--r);font-family:var(--mono);font-weight:800">${st.games.filter(filled).length} of 40 filled</span>
+      <div class="sp"></div><span class="hint" style="color:var(--r);font-family:var(--mono);font-weight:800">${st.games.slice(0,n).filter(filled).length} of ${n} filled</span>
       <button class="btn sm danger" id="gClear">Clear all</button></div>
     <div style="overflow-x:auto"><table>
       <thead><tr><th style="width:64px">Slot</th><th style="width:72px">Game no.</th><th>Game name</th>
         <th style="width:82px">Price</th><th style="width:74px">Prizes left</th><th style="width:74px">Current</th>
         <th style="width:190px">Flags</th><th style="width:140px">Swap</th><th style="width:170px">Assign from catalog</th>
         <th style="width:200px">Picture</th><th style="width:60px"></th></tr></thead>
-      <tbody>${st.games.map((g,i)=>`<tr>
+      <tbody>${st.games.slice(0,n).map((g,i)=>`<tr>
         <td><div style="display:flex;align-items:center;gap:5px">
           <span class="rno" style="font-size:14px">${String(g.slot).padStart(2,'0')}</span>
           <div style="display:flex;flex-direction:column;gap:2px">
             <button class="btn sm" data-up="${i}" ${i===0?'disabled':''} title="Move up a slot" style="padding:0 5px;line-height:1.35">▲</button>
-            <button class="btn sm" data-down="${i}" ${i===39?'disabled':''} title="Move down a slot" style="padding:0 5px;line-height:1.35">▼</button>
+            <button class="btn sm" data-down="${i}" ${i===n-1?'disabled':''} title="Move down a slot" style="padding:0 5px;line-height:1.35">▼</button>
           </div></div></td>
         <td><input class="in mono" data-f="no" data-i="${i}" value="${esc(g.no)}" maxlength="6" placeholder="—"></td>
         <td><input class="in" data-f="name" data-i="${i}" value="${esc(g.name)}" placeholder="Game name"></td>
@@ -1167,7 +1172,7 @@ function tabGames(st){
           </select></div></td>
         <td><select class="in mono" data-swap="${i}" style="width:130px;font-size:12px">
           <option value="">Swap with…</option>
-          ${st.games.map((s,j)=>j===i?'':`<option value="${j}">${String(s.slot).padStart(2,'0')} · ${filled(s)?esc(s.name.slice(0,14)):'open'}</option>`).join('')}
+          ${st.games.slice(0,n).map((s,j)=>j===i?'':`<option value="${j}">${String(s.slot).padStart(2,'0')} · ${filled(s)?esc(s.name.slice(0,14)):'open'}</option>`).join('')}
         </select></td>
         <td><select class="in mono" data-assign="${i}" style="width:160px;font-size:12px">
           <option value="">${filled(g)?'Replace with…':'Assign game…'}</option>
@@ -1198,6 +1203,7 @@ function tabBrand(st){
         <button class="btn sm" id="bLogoPick">Upload</button>
         <button class="btn sm" id="bLogoLink">Link</button>
         ${b.logo?'<button class="btn sm danger" id="bLogoDel">×</button>':''}</div></div>
+      <div class="f"><label>Number of slots</label><select id="bSlots" title="How many of the 40 slots this board uses — the rest are hidden on the TV, Games tab and Lotto boxes">${Array.from({length:40},(_,k)=>k+1).map(k=>`<option value="${k}" ${slotCount(st)===k?'selected':''}>${k}</option>`).join('')}</select></div>
       <div class="f"><label>Columns on TV</label><select id="bCols"><option value="auto" ${st.view.cols==='auto'?'selected':''}>Auto — fill the screen</option>${[4,5,6,7,8,10].map(n=>`<option value="${n}" ${+st.view.cols===n?'selected':''}>${n} across</option>`).join('')}</select></div>
       <div class="f"><label>Empty slots</label><select id="bEmpty">
         <option value="show" ${st.view.empty==='show'?'selected':''}>Show as blanks</option>
@@ -1340,7 +1346,7 @@ function tabSales(st){
 /* a box's price is its matching Games slot's price — locked to the board, not stored */
 const boxPrice=i=>+((S().games[i]||{}).price)||0;
 const lottoBoxValue=(e,i)=>boxPrice(i)*(+((e.boxes||[])[i]||{}).qty||0);
-const lottoBoxTotal=e=>(e.boxes||[]).reduce((a,_,i)=>a+lottoBoxValue(e,i),0);
+const lottoBoxTotal=e=>(e.boxes||[]).reduce((a,_,i)=>i<slotCount()?a+lottoBoxValue(e,i):a,0);
 const lottoSold=e=>(+e.open||0)-(+e.close||0)+(+e.add||0)+(+e.online||0);
 const lottoOverShort=e=>lottoBoxTotal(e)-(+e.close||0);
 let ltEditDate=null;
@@ -1355,11 +1361,12 @@ function tabLotto(st){
   if(ltEditDate&&!st.lotto[ltEditDate])ltEditDate=null;
 
   if(ltEditDate){
+    const n=slotCount(st);
     const d=ltEditDate,e=st.lotto[d],sold=lottoSold(e),boxTotal=lottoBoxTotal(e),os=lottoOverShort(e);
     const prevDate=Object.keys(st.lotto).filter(x=>x<d).sort().reverse()[0];
     const prevBoxes=prevDate?st.lotto[prevDate].boxes:null;
     return `<div class="panel"><div class="ph">
-        <h3>${d}</h3><span class="hint">Machine meter, then the 40 boxes — one per Games slot, in the same order</span>
+        <h3>${d}</h3><span class="hint">Machine meter, then the ${n} boxes — one per Games slot, in the same order</span>
         <div class="sp"></div><button class="btn sm" id="ltBack">← Back to all days</button></div>
       <div class="pb"><div class="fields">
         <div class="f"><label>Open</label><input class="in mono" data-lt="open" data-date="${d}" value="${esc(e.open)}" style="width:110px"></div>
@@ -1372,12 +1379,12 @@ function tabLotto(st){
       </div></div></div>
 
       <div class="panel"><div class="ph"><h3>Boxes</h3>
-        <span class="hint">Boxes 1–40 match your Games slots exactly. Price comes from the Games tab; just enter how many tickets are left in each box.${prevDate?` Change is vs ${prevDate}.`:''}</span>
+        <span class="hint">Boxes 1–${n} match your Games slots exactly. Price comes from the Games tab; just enter how many tickets are left in each box.${prevDate?` Change is vs ${prevDate}.`:''}</span>
         </div>
         <div style="overflow-x:auto"><table>
           <thead><tr><th style="width:50px">Box</th><th>Game</th><th style="width:70px">Price</th><th style="width:110px">Quantity</th>
             <th style="width:120px">${prevDate?'Sold':''}</th><th style="width:110px">Value</th></tr></thead>
-          <tbody>${e.boxes.map((b,i)=>{
+          <tbody>${e.boxes.slice(0,n).map((b,i)=>{
             const g=st.games[i]||{};
             const prevB=prevBoxes?prevBoxes[i]:null;
             const delta=(prevB&&prevB.qty!==''&&b.qty!=='')?(+prevB.qty||0)-(+b.qty||0):null;
@@ -1400,7 +1407,7 @@ function tabLotto(st){
       <div class="stat"><div class="k">Days with a mismatch</div><div class="v" style="color:${mo.mismatch?'#D62828':'#157F3B'}">${mo.mismatch}</div></div>
     </div>
     <div class="panel"><div class="ph"><h3>Lotto machine reconciliation</h3>
-      <span class="hint">SOLD = (OPEN − CLOSE) + ADD + ONLINE · the 40 boxes' price×quantity should sum to CLOSE</span>
+      <span class="hint">SOLD = (OPEN − CLOSE) + ADD + ONLINE · the ${slotCount(st)} boxes' price×quantity should sum to CLOSE</span>
       <div class="sp"></div><button class="btn sm" id="lottoCsv">Export CSV</button>
       <button class="btn sm go" id="lottoAdd">Log a day</button></div>
     <div style="overflow-x:auto"><table>
@@ -1422,7 +1429,7 @@ function tabLotto(st){
       </tbody></table></div>
     <div class="pb"><div class="note"><div><b>Reading this table.</b> Type the machine's <b>Open</b> and <b>Close</b> meter numbers for the day —
       Close carries over as next day's Open automatically when you log a new day. <b>Add</b> is a fresh roll loaded mid-day; <b>Online</b> is any
-      online-lotto adjustment. Click <b>Boxes</b> to enter that day's quantities for boxes <b>1–40</b> — the same slots, in the same order, as
+      online-lotto adjustment. Click <b>Boxes</b> to enter that day's quantities for boxes <b>1–${slotCount(st)}</b> — the same slots, in the same order, as
       your Games tab. Each box's price is taken straight from the Games tab, so price×quantity should add up to that day's Close; if it
       doesn't, <b>Over/short</b> flags the gap instead of it going unnoticed until month end.<br><br>
       <b>Changed the ticket in a box?</b> Update that slot's price on the <b>Games</b> tab — the box here follows it automatically. Put the
@@ -1638,6 +1645,7 @@ $('#aBody').addEventListener('change',e=>{
   if(el.dataset.flag){st.games[i][el.dataset.flag]=el.checked;save();return}
   if(el.dataset.stock!=null){st.games[+el.dataset.stock].status=el.value;save();reRender();return}
   if(el.dataset.lt||el.dataset.ltqty!=null||el.dataset.ltprice!=null){reRender();return}  // recompute Sold/Over-short once they leave the field
+  if(el.id==='bSlots'){st.view.slots=Math.min(40,Math.max(1,+el.value||40));save();reRender()}
   if(el.id==='bCols'){st.view.cols=el.value==='auto'?'auto':+el.value;save();reRender()}
   if(el.id==='bEmpty'){st.view.empty=el.value;save()}
   if(el.id==='bSort'){st.view.sort=el.value;save()}
@@ -1773,7 +1781,7 @@ $('#aBody').addEventListener('click',async e=>{
   }
 
   if(d.up!=null){const i=+d.up;if(i>0){swapSlots(st,i,i-1);save();reRender()}}
-  if(d.down!=null){const i=+d.down;if(i<39){swapSlots(st,i,i+1);save();reRender()}}
+  if(d.down!=null){const i=+d.down;if(i<slotCount(st)-1){swapSlots(st,i,i+1);save();reRender()}}
   if(b.id==='txAddAll'){
     const list=TX.filter(g=>(!txPrice||g.price===+txPrice)&&(!txQ||(g.name+' '+g.no).toLowerCase().includes(txQ.toLowerCase())));
     let n=0;list.forEach(g=>{if(txAdd(st,g.no))n++});
