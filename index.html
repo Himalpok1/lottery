@@ -181,11 +181,15 @@ button{font-family:inherit}
 /* owner-set OUT OF STOCK / COMING SOON — a full-tile picture that replaces the ticket art */
 .stockArt{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;
   justify-content:center;gap:calc(var(--cell)*.028);text-align:center;color:#fff;overflow:hidden;pointer-events:none}
-.stockArt.oos{background:radial-gradient(120% 100% at 50% 32%,#EF4B42 0%,#C0261E 52%,#7E0F09 100%)}
-.stockArt.soon{background:radial-gradient(120% 100% at 50% 32%,#43A6EC 0%,#1F72B6 52%,#0F4675 100%)}
+/* black poster; the label carries the colour so it still reads OOS vs Coming Soon */
+.stockArt{background:radial-gradient(120% 100% at 50% 32%,#1b1c20 0%,#0a0a0c 70%,#000 100%)}
+.stockArt.oos .lbl,.stockArt.oos .ico{color:#FF5A4E}
+.stockArt.oos .ico{stroke:#FF5A4E}
+.stockArt.soon .lbl,.stockArt.soon .ico{color:#5AB4FF}
+.stockArt.soon .ico{stroke:#5AB4FF}
 /* faint diagonal caution stripes behind the label */
-.stockArt::before{content:"";position:absolute;inset:0;opacity:.13;
-  background:repeating-linear-gradient(45deg,#000 0 calc(var(--cell)*.055),transparent 0 calc(var(--cell)*.11))}
+.stockArt::before{content:"";position:absolute;inset:0;opacity:.10;
+  background:repeating-linear-gradient(45deg,#fff 0 calc(var(--cell)*.055),transparent 0 calc(var(--cell)*.11))}
 .stockArt .ico{width:calc(var(--cell)*.30);height:calc(var(--cell)*.30);position:relative;
   filter:drop-shadow(0 calc(var(--cell)*.006) calc(var(--cell)*.012) rgba(0,0,0,.4))}
 .stockArt .lbl{position:relative;font-family:var(--display);font-weight:800;text-transform:uppercase;
@@ -1629,7 +1633,7 @@ $('#aBody').addEventListener('input',e=>{
 $('#aBody').addEventListener('change',e=>{
   const st=S(),el=e.target,i=+el.dataset.i;
   if(el.dataset.flag){st.games[i][el.dataset.flag]=el.checked;save();return}
-  if(el.dataset.stock!=null){st.games[i].status=el.value;save();reRender();return}
+  if(el.dataset.stock!=null){st.games[+el.dataset.stock].status=el.value;save();reRender();return}
   if(el.dataset.lt||el.dataset.ltqty!=null||el.dataset.ltprice!=null){reRender();return}  // recompute Sold/Over-short once they leave the field
   if(el.id==='bCols'){st.view.cols=el.value==='auto'?'auto':+el.value;save();reRender()}
   if(el.id==='bEmpty'){st.view.empty=el.value;save()}
