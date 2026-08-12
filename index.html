@@ -1352,9 +1352,19 @@ const lottoBoxTotal=e=>(e.boxes||[]).reduce((a,_,i)=>i<slotCount()?a+lottoBoxVal
 const effClose=e=>e.closeAuto===true?lottoBoxTotal(e):(+e.close||0);
 const lottoSold=e=>(+e.open||0)-effClose(e)+(+e.add||0)+(+e.online||0);
 const lottoOverShort=e=>lottoBoxTotal(e)-effClose(e);
+/* today's Close is tomorrow's Open: pin each day's Open to the previous day's
+   (effective) Close, unless the owner typed their own Open for that day */
+function syncLottoChain(st){
+  const days=Object.keys(st.lotto||{}).sort();
+  for(let k=1;k<days.length;k++){
+    const e=st.lotto[days[k]];
+    if(e.openAuto!==false)e.open=effClose(st.lotto[days[k-1]]).toFixed(2);
+  }
+}
 let ltEditDate=null;
 function tabLotto(st){
   st.lotto=st.lotto||{};
+  syncLottoChain(st);   // today's Close flows into tomorrow's Open before we draw anything
   const dates=Object.keys(st.lotto).sort().reverse();
   const today=new Date().toISOString().slice(0,10);
   const month=today.slice(0,7);
@@ -1372,7 +1382,7 @@ function tabLotto(st){
         <h3>${d}</h3><span class="hint">Machine meter, then the ${n} boxes — one per Games slot, in the same order</span>
         <div class="sp"></div><button class="btn sm" id="ltBack">← Back to all days</button></div>
       <div class="pb"><div class="fields">
-        <div class="f"><label>Open</label><input class="in mono" data-lt="open" data-date="${d}" value="${esc(e.open)}" style="width:110px"></div>
+        <div class="f"><label>Open ${prevDate?(e.openAuto===false?`<button class="btn sm" data-ltopenauto="${d}" title="Pin Open back to yesterday's Close" style="padding:0 6px;line-height:1.4">↻ yesterday's close</button>`:'<span class="rno" style="color:#157F3B">auto</span>'):''}</label><input class="in mono" data-lt="open" data-date="${d}" value="${esc(e.open)}" style="width:110px${(prevDate&&e.openAuto!==false)?';background:var(--sf-2)':''}"></div>
         <div class="f"><label>Add</label><input class="in mono" data-lt="add" data-date="${d}" value="${esc(e.add)}" style="width:90px"></div>
         <div class="f"><label>Online</label><input class="in mono" data-lt="online" data-date="${d}" value="${esc(e.online)}" style="width:90px"></div>
         <div class="f"><label>Close ${e.closeAuto===true?'<span class="rno" style="color:#157F3B">auto</span>':`<button class="btn sm" data-ltcloseauto="${d}" title="Set Close back to the box total" style="padding:0 6px;line-height:1.4">↻ box total</button>`}</label><input class="in mono" data-lt="close" data-date="${d}" value="${e.closeAuto===true?boxTotal.toFixed(2):esc(e.close)}" style="width:110px${e.closeAuto===true?';background:var(--sf-2)':''}"></div>
@@ -1631,7 +1641,7 @@ $('#aBody').addEventListener('input',e=>{
   if(el.dataset.w){st.winners[i][el.dataset.w]=el.value;save();return}
   if(el.dataset.ac&&el.dataset.ac!=='role'){db.accounts[i][el.dataset.ac]=el.value;save();return}
   if(el.dataset.st){const s=db.stores.find(x=>x.id===el.dataset.st);if(s)s.name=el.value;save();return}
-  if(el.dataset.lt){const ee=st.lotto[el.dataset.date];ee[el.dataset.lt]=el.value;if(el.dataset.lt==='close')ee.closeAuto=false;save();return}
+  if(el.dataset.lt){const ee=st.lotto[el.dataset.date];ee[el.dataset.lt]=el.value;if(el.dataset.lt==='close')ee.closeAuto=false;if(el.dataset.lt==='open')ee.openAuto=false;save();return}
   if(el.dataset.ltqty!=null){st.lotto[el.dataset.date].boxes[+el.dataset.ltqty].qty=el.value;save();return}
   if(el.dataset.ltprice!=null){st.lotto[el.dataset.date].boxes[+el.dataset.ltprice].price=el.value;save();return}
   if(el.id==='bT'){st.brand.title=el.value;save()}
@@ -1646,7 +1656,7 @@ $('#aBody').addEventListener('change',e=>{
   const st=S(),el=e.target,i=+el.dataset.i;
   if(el.dataset.flag){st.games[i][el.dataset.flag]=el.checked;save();return}
   if(el.dataset.stock!=null){st.games[+el.dataset.stock].status=el.value;save();reRender();return}
-  if(el.dataset.lt||el.dataset.ltqty!=null||el.dataset.ltprice!=null){reRender();return}  // recompute Sold/Over-short once they leave the field
+  if(el.dataset.lt||el.dataset.ltqty!=null||el.dataset.ltprice!=null){syncLottoChain(S());save();reRender();return}  // recompute Sold/Over-short + carry Close→next Open once they leave the field
   if(el.id==='bSlots'){st.view.slots=Math.min(40,Math.max(1,+el.value||40));save();reRender()}
   if(el.id==='bCols'){st.view.cols=el.value==='auto'?'auto':+el.value;save();reRender()}
   if(el.id==='bEmpty'){st.view.empty=el.value;save()}
@@ -1765,12 +1775,13 @@ $('#aBody').addEventListener('click',async e=>{
     // always come live from the Games tab, so there's nothing per-box to seed there
     const prevDate=Object.keys(st.lotto).sort().reverse()[0];
     const prev=prevDate?st.lotto[prevDate]:null;
-    st.lotto[d2]={open:prev?String(effClose(prev).toFixed(2)):'',add:'',online:'',close:'',closeAuto:true,
+    st.lotto[d2]={open:prev?String(effClose(prev).toFixed(2)):'',openAuto:true,add:'',online:'',close:'',closeAuto:true,
       boxes:Array.from({length:40},(_,i)=>({qty:prev&&prev.boxes[i]?String(prev.boxes[i].qty??''):''}))};
     save();ltEditDate=d2;reRender();toast('Today added — enter the box quantities; Close fills in from their total');
   }
   if(d.ltedit){ltEditDate=d.ltedit;reRender()}
-  if(d.ltcloseauto){const ee=st.lotto[d.ltcloseauto];if(ee){ee.closeAuto=true;ee.close='';save();reRender()}}
+  if(d.ltcloseauto){const ee=st.lotto[d.ltcloseauto];if(ee){ee.closeAuto=true;ee.close='';syncLottoChain(st);save();reRender()}}
+  if(d.ltopenauto){const ee=st.lotto[d.ltopenauto];if(ee){ee.openAuto=true;syncLottoChain(st);save();reRender()}}
   if(b.id==='ltBack'){ltEditDate=null;reRender()}
   if(d.ltdel){if(confirm(`Remove the ${d.ltdel} lotto entry?`)){delete st.lotto[d.ltdel];if(ltEditDate===d.ltdel)ltEditDate=null;save();reRender()}}
   if(b.id==='lottoCsv'){
