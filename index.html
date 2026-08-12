@@ -757,7 +757,7 @@ const newStore=(name)=>({
   id:'s'+Math.random().toString(36).slice(2,8),name,
   brand:{title:name,sub:'Scratch-Offs',logo:'',theme:'texas',accent:'#D62828',
          bgType:'theme',bgImage:'',bgVideo:''},
-  view:{cols:'auto',empty:'show',sort:'slot',endingAt:3,tile:'card',slots:40,showJp:true,showDraws:true,showAds:true,showWinners:true,adSecs:8},
+  view:{cols:'auto',empty:'show',sort:'slot',endingAt:3,tile:'card',slots:40,lottoShifts:1,lottoShiftNames:['Shift 1','Shift 2'],showJp:true,showDraws:true,showAds:true,showWinners:true,adSecs:8},
   games:blankGames(),ads:[],jackpots:[],winners:[],sales:{},lotto:{},lottoBoxPrices:[...LOTTO_BOX_PRICES],feedUrl:''
 });
 const fresh=()=>{const s=newStore('Swing by Maypearl');return{stores:[s],active:s.id,
@@ -771,17 +771,23 @@ const normalizeDb=d=>{
   (d.stores||[]).forEach(s=>{
     (s.games||[]).forEach(g=>{if(typeof g.status!=='string')g.status=''});  // stock override added later
     if(!s.lotto||typeof s.lotto!=='object')s.lotto={};
-    // Boxes now mirror the 40 game slots 1-to-1: box i IS slot i, and its price is the
-    // Games-tab price for that slot (not stored per box). Each day records only the
-    // quantity left in each of the 40 boxes. Migrate any older shape (38 boxes, or a
-    // bare qty array) by carrying quantities across by index and padding to 40.
+    if(!(+((s.view||{}).lottoShifts)))((s.view=s.view||{}).lottoShifts=1);
+    if(!Array.isArray((s.view||{}).lottoShiftNames))s.view.lottoShiftNames=['Shift 1','Shift 2'];
+    // Boxes mirror the 40 game slots 1-to-1 (box i IS slot i, priced from the Games tab).
+    // A day is now {shifts:[…]}. Migrate older shapes: a flat single-day entry becomes one
+    // shift; 38-box / bare-qty arrays get carried across by index and padded to 40.
+    const fixBoxes=(ob,oq)=>Array.from({length:40},(_,i)=>({qty:ob&&ob[i]?String(ob[i].qty??''):(oq?String(oq[i]||''):'')}));
     Object.values(s.lotto).forEach(e=>{
-      const oldBoxes=Array.isArray(e.boxes)?e.boxes:null;
-      const oldQty=Array.isArray(e.qty)?e.qty:null;
-      e.boxes=Array.from({length:40},(_,i)=>({
-        qty: oldBoxes&&oldBoxes[i]?String(oldBoxes[i].qty??'') : (oldQty?String(oldQty[i]||''):'')
-      }));
-      delete e.qty;
+      if(!Array.isArray(e.shifts)){
+        const sh={clerk:'',open:e.open??'',openAuto:e.openAuto,add:e.add??'',online:e.online??'',close:e.close??'',closeAuto:e.closeAuto,
+          boxes:fixBoxes(Array.isArray(e.boxes)?e.boxes:null,Array.isArray(e.qty)?e.qty:null)};
+        e.shifts=[sh];
+        ['open','openAuto','add','online','close','closeAuto','boxes','qty'].forEach(k=>delete e[k]);
+      }
+      e.shifts.forEach(sh=>{
+        if(typeof sh.clerk!=='string')sh.clerk='';
+        sh.boxes=fixBoxes(Array.isArray(sh.boxes)?sh.boxes:null,null);
+      });
     });
   });
   return d;
@@ -1343,75 +1349,88 @@ function tabSales(st){
    $20 roll in its place). Each day snapshots its own {price, qty} per box, seeded from
    the day before, so swapping a box's ticket only affects today onward: yesterday's
    record still shows the $50 price it actually was, it doesn't get silently rewritten. */
-/* a box's price is its matching Games slot's price — locked to the board, not stored */
+/* ---- box + shift math. A "shift" holds {clerk,open,openAuto,add,online,close,closeAuto,boxes[]};
+   a day is {shifts:[…]} — one shift by default, two when the store splits the day. ---- */
 const boxPrice=i=>+((S().games[i]||{}).price)||0;
-const lottoBoxValue=(e,i)=>boxPrice(i)*(+((e.boxes||[])[i]||{}).qty||0);
-const lottoBoxTotal=e=>(e.boxes||[]).reduce((a,_,i)=>i<slotCount()?a+lottoBoxValue(e,i):a,0);
-/* Close auto-fills from the box total (boxes 1–N) unless the owner has typed over it.
-   closeAuto===true → use the live box total; otherwise use the number they entered. */
-const effClose=e=>e.closeAuto===true?lottoBoxTotal(e):(+e.close||0);
-const lottoSold=e=>(+e.open||0)-effClose(e)+(+e.add||0)+(+e.online||0);
-const lottoOverShort=e=>lottoBoxTotal(e)-effClose(e);
-/* today's Close is tomorrow's Open: pin each day's Open to the previous day's
-   (effective) Close, unless the owner typed their own Open for that day */
-function syncLottoChain(st){
-  const days=Object.keys(st.lotto||{}).sort();
-  for(let k=1;k<days.length;k++){
-    const e=st.lotto[days[k]];
-    if(e.openAuto!==false)e.open=effClose(st.lotto[days[k-1]]).toFixed(2);
-  }
-}
+const lottoBoxValue=(sh,i)=>boxPrice(i)*(+((sh.boxes||[])[i]||{}).qty||0);
+const lottoBoxTotal=sh=>(sh.boxes||[]).reduce((a,_,i)=>i<slotCount()?a+lottoBoxValue(sh,i):a,0);
+/* Close auto-fills from the box total unless typed over (closeAuto===false) */
+const effClose=sh=>sh.closeAuto===true?lottoBoxTotal(sh):(+sh.close||0);
+const lottoSold=sh=>(+sh.open||0)-effClose(sh)+(+sh.add||0)+(+sh.online||0);
+const lottoOverShort=sh=>lottoBoxTotal(sh)-effClose(sh);
+/* a day rolls its shifts up: Open = first shift's open, Close = last shift's close */
+const dayShifts=day=>day&&Array.isArray(day.shifts)?day.shifts:[];
+const dayLast=day=>dayShifts(day)[dayShifts(day).length-1];
+const dayOpen=day=>{const s=dayShifts(day)[0];return s?(+s.open||0):0};
+const dayClose=day=>{const s=dayLast(day);return s?effClose(s):0};
+const dayAdd=day=>dayShifts(day).reduce((a,s)=>a+(+s.add||0),0);
+const dayOnline=day=>dayShifts(day).reduce((a,s)=>a+(+s.online||0),0);
+const daySold=day=>dayShifts(day).reduce((a,s)=>a+lottoSold(s),0);
+const dayBoxTotal=day=>{const s=dayLast(day);return s?lottoBoxTotal(s):0};
+const dayOverShort=day=>dayShifts(day).reduce((a,s)=>a+lottoOverShort(s),0);
+/* every shift across every day, in chronological then shift order */
+function lottoTimeline(st){const out=[];Object.keys(st.lotto||{}).sort().forEach(d=>dayShifts(st.lotto[d]).forEach(s=>out.push(s)));return out}
+/* one shift's Close is the next shift's Open — across shifts AND across days */
+function syncLottoChain(st){const tl=lottoTimeline(st);for(let k=1;k<tl.length;k++){if(tl[k].openAuto!==false)tl[k].open=effClose(tl[k-1]).toFixed(2)}}
+const lottoShiftCount=st=>Math.min(2,Math.max(1,+(((st||S()).view||{}).lottoShifts)||1));
+const lottoShiftName=(st,i)=>{const nm=((st||S()).view||{}).lottoShiftNames;return (Array.isArray(nm)&&nm[i]&&String(nm[i]).trim())?nm[i]:('Shift '+(i+1))};
+const makeShift=()=>({clerk:'',open:'',openAuto:true,add:'',online:'',close:'',closeAuto:true,boxes:Array.from({length:40},()=>({qty:''}))});
 let ltEditDate=null;
+function shiftEditor(st,d,day,si,prevBoxes){
+  const n=slotCount(st),sh=day.shifts[si],multi=day.shifts.length>1||lottoShiftCount(st)>1;
+  const sold=lottoSold(sh),boxTotal=lottoBoxTotal(sh),os=lottoOverShort(sh);
+  const osColor=x=>x===0?'#157F3B':Math.abs(x)<20?'#B8860B':'#D62828';
+  const hasPrev=si>0||Object.keys(st.lotto).some(x=>x<d),openAuto=sh.openAuto!==false;
+  return `<div class="panel"><div class="ph">
+      <h3>${multi?esc(lottoShiftName(st,si)):'Reconciliation'}</h3>
+      <span class="hint">Clerk</span><input class="in" data-ltclerk="${si}" data-date="${d}" value="${esc(sh.clerk||'')}" placeholder="who worked it" style="width:150px">
+      ${multi?`<span class="rno" style="margin-left:auto;color:${osColor(os)}">${os>=0?'+':''}$${os.toFixed(2)}</span>
+        ${si>0?`<button class="btn sm danger" data-ltdelshift="${si}" data-date="${d}" style="margin-left:8px">Remove</button>`:''}`:''}</div>
+    <div class="pb"><div class="fields">
+      <div class="f"><label>Open ${hasPrev?(openAuto?'<span class="rno" style="color:#157F3B">auto</span>':`<button class="btn sm" data-ltopenauto="${si}" data-date="${d}" title="Pin Open back to the previous Close" style="padding:0 6px;line-height:1.4">↻ prev close</button>`):''}</label><input class="in mono" data-lt="open" data-shift="${si}" data-date="${d}" value="${esc(sh.open)}" style="width:110px${(hasPrev&&openAuto)?';background:var(--sf-2)':''}"></div>
+      <div class="f"><label>Add</label><input class="in mono" data-lt="add" data-shift="${si}" data-date="${d}" value="${esc(sh.add)}" style="width:90px"></div>
+      <div class="f"><label>Online</label><input class="in mono" data-lt="online" data-shift="${si}" data-date="${d}" value="${esc(sh.online)}" style="width:90px"></div>
+      <div class="f"><label>Close ${sh.closeAuto===true?'<span class="rno" style="color:#157F3B">auto</span>':`<button class="btn sm" data-ltcloseauto="${si}" data-date="${d}" title="Set Close back to the box total" style="padding:0 6px;line-height:1.4">↻ box total</button>`}</label><input class="in mono" data-lt="close" data-shift="${si}" data-date="${d}" value="${sh.closeAuto===true?boxTotal.toFixed(2):esc(sh.close)}" style="width:110px${sh.closeAuto===true?';background:var(--sf-2)':''}"></div>
+      <div class="f"><label>Sold</label><div class="in mono" style="width:110px;background:var(--sf-2);${sold<0?'color:#D62828':''}"><b>$${sold.toFixed(2)}</b></div></div>
+      <div class="f"><label>Box total</label><div class="in mono" style="width:110px;background:var(--sf-2)"><b>$${boxTotal.toFixed(2)}</b></div></div>
+      <div class="f"><label>Over/short</label><div class="in mono" style="width:110px;background:var(--sf-2);color:${osColor(os)}"><b>${os>=0?'+':''}$${os.toFixed(2)}</b></div></div>
+    </div>
+    <div style="overflow-x:auto;margin-top:10px"><table>
+      <thead><tr><th style="width:50px">Box</th><th>Game</th><th style="width:70px">Price</th><th style="width:110px">Quantity</th><th style="width:120px">Sold</th><th style="width:110px">Value</th></tr></thead>
+      <tbody>${sh.boxes.slice(0,n).map((b,i)=>{const g=st.games[i]||{};const prevB=prevBoxes?prevBoxes[i]:null;
+        const delta=(prevB&&prevB.qty!==''&&b.qty!=='')?(+prevB.qty||0)-(+b.qty||0):null;const out=b.qty!==''&&+b.qty===0;
+        return `<tr><td class="rno">${i+1}</td><td>${g.name?esc(g.name):'<span style="color:var(--ink-3)">— empty slot —</span>'}</td>
+          <td class="rno">${g.price!==''&&g.price!=null?'$'+esc(g.price):'—'}</td>
+          <td><input class="in mono" data-ltqty="${i}" data-shift="${si}" data-date="${d}" value="${esc(b.qty)}" placeholder="0" style="width:90px">${out?'<span class="rno" style="color:#D62828;margin-left:6px">OUT</span>':''}</td>
+          <td class="rno" style="${delta==null?'':delta>0?'color:#157F3B':delta<0?'color:#B8860B':''}">${delta==null?'—':delta===0?'0':(delta>0?delta+' sold':'+'+Math.abs(delta)+' added')}</td>
+          <td class="rno">$${lottoBoxValue(sh,i).toFixed(2)}</td></tr>`}).join('')}
+      </tbody></table></div></div></div>`;
+}
 function tabLotto(st){
   st.lotto=st.lotto||{};
   syncLottoChain(st);   // today's Close flows into tomorrow's Open before we draw anything
   const dates=Object.keys(st.lotto).sort().reverse();
   const today=new Date().toISOString().slice(0,10);
   const month=today.slice(0,7);
-  const mo=dates.filter(d=>d.startsWith(month)).reduce((a,d)=>{const e=st.lotto[d];
-    return{sold:a.sold+lottoSold(e),mismatch:a.mismatch+(lottoOverShort(e)!==0?1:0)}},{sold:0,mismatch:0});
+  const mo=dates.filter(d=>d.startsWith(month)).reduce((a,d)=>{const day=st.lotto[d];
+    return{sold:a.sold+daySold(day),mismatch:a.mismatch+(dayOverShort(day)!==0?1:0)}},{sold:0,mismatch:0});
   const osColor=n=>n===0?'#157F3B':Math.abs(n)<20?'#B8860B':'#D62828';
   if(ltEditDate&&!st.lotto[ltEditDate])ltEditDate=null;
 
   if(ltEditDate){
-    const n=slotCount(st);
-    const d=ltEditDate,e=st.lotto[d],sold=lottoSold(e),boxTotal=lottoBoxTotal(e),os=lottoOverShort(e);
+    const d=ltEditDate,day=st.lotto[d],shifts=dayShifts(day),cfg=lottoShiftCount(st);
     const prevDate=Object.keys(st.lotto).filter(x=>x<d).sort().reverse()[0];
-    const prevBoxes=prevDate?st.lotto[prevDate].boxes:null;
-    return `<div class="panel"><div class="ph">
-        <h3>${d}</h3><span class="hint">Machine meter, then the ${n} boxes — one per Games slot, in the same order</span>
-        <div class="sp"></div><button class="btn sm" id="ltBack">← Back to all days</button></div>
-      <div class="pb"><div class="fields">
-        <div class="f"><label>Open ${prevDate?(e.openAuto===false?`<button class="btn sm" data-ltopenauto="${d}" title="Pin Open back to yesterday's Close" style="padding:0 6px;line-height:1.4">↻ yesterday's close</button>`:'<span class="rno" style="color:#157F3B">auto</span>'):''}</label><input class="in mono" data-lt="open" data-date="${d}" value="${esc(e.open)}" style="width:110px${(prevDate&&e.openAuto!==false)?';background:var(--sf-2)':''}"></div>
-        <div class="f"><label>Add</label><input class="in mono" data-lt="add" data-date="${d}" value="${esc(e.add)}" style="width:90px"></div>
-        <div class="f"><label>Online</label><input class="in mono" data-lt="online" data-date="${d}" value="${esc(e.online)}" style="width:90px"></div>
-        <div class="f"><label>Close ${e.closeAuto===true?'<span class="rno" style="color:#157F3B">auto</span>':`<button class="btn sm" data-ltcloseauto="${d}" title="Set Close back to the box total" style="padding:0 6px;line-height:1.4">↻ box total</button>`}</label><input class="in mono" data-lt="close" data-date="${d}" value="${e.closeAuto===true?boxTotal.toFixed(2):esc(e.close)}" style="width:110px${e.closeAuto===true?';background:var(--sf-2)':''}"></div>
-        <div class="f"><label>Sold</label><div class="in mono" style="width:110px;background:var(--sf-2);${sold<0?'color:#D62828':''}"><b>$${sold.toFixed(2)}</b></div></div>
-        <div class="f"><label>Box total</label><div class="in mono" style="width:110px;background:var(--sf-2)"><b>$${boxTotal.toFixed(2)}</b></div></div>
-        <div class="f"><label>Over/short</label><div class="in mono" style="width:110px;background:var(--sf-2);color:${osColor(os)}"><b>${os>=0?'+':''}$${os.toFixed(2)}</b></div></div>
-      </div></div></div>
-
-      <div class="panel"><div class="ph"><h3>Boxes</h3>
-        <span class="hint">Boxes 1–${n} match your Games slots exactly. Price comes from the Games tab; just enter how many tickets are left in each box.${prevDate?` Change is vs ${prevDate}.`:''}</span>
-        </div>
-        <div style="overflow-x:auto"><table>
-          <thead><tr><th style="width:50px">Box</th><th>Game</th><th style="width:70px">Price</th><th style="width:110px">Quantity</th>
-            <th style="width:120px">${prevDate?'Sold':''}</th><th style="width:110px">Value</th></tr></thead>
-          <tbody>${e.boxes.slice(0,n).map((b,i)=>{
-            const g=st.games[i]||{};
-            const prevB=prevBoxes?prevBoxes[i]:null;
-            const delta=(prevB&&prevB.qty!==''&&b.qty!=='')?(+prevB.qty||0)-(+b.qty||0):null;
-            const out=b.qty!==''&&+b.qty===0;
-            return `<tr>
-            <td class="rno">${i+1}</td>
-            <td>${g.name?esc(g.name):'<span style="color:var(--ink-3)">— empty slot —</span>'}</td>
-            <td class="rno">${g.price!==''&&g.price!=null?'$'+esc(g.price):'—'}</td>
-            <td><input class="in mono" data-ltqty="${i}" data-date="${d}" value="${esc(b.qty)}" placeholder="0" style="width:90px">
-              ${out?'<span class="rno" style="color:#D62828;margin-left:6px">OUT</span>':''}</td>
-            <td class="rno" style="${delta==null?'':delta>0?'color:#157F3B':delta<0?'color:#B8860B':''}">
-              ${delta==null?'—':delta===0?'0':(delta>0?delta+' sold':'+'+Math.abs(delta)+' added')}</td>
-            <td class="rno">$${lottoBoxValue(e,i).toFixed(2)}</td></tr>`}).join('')}
-          </tbody></table></div></div>`;
+    const prevDayLast=prevDate?dayLast(st.lotto[prevDate]):null;
+    let out=`<div class="panel"><div class="ph"><h3>${d}</h3>
+        <span class="hint">${shifts.length>1?shifts.length+' shifts — over/short lands on whoever worked each':'One shift · boxes match your Games slots'}</span>
+        <div class="sp"></div>
+        ${shifts.length<2&&cfg>1?`<button class="btn sm go" data-ltaddshift="${d}">+ Add ${esc(lottoShiftName(st,shifts.length))}</button>`:''}
+        <button class="btn sm" id="ltBack">← Back to all days</button></div></div>`;
+    shifts.forEach((sh,si)=>{
+      const prevBoxes=si>0?shifts[si-1].boxes:(prevDayLast?prevDayLast.boxes:null);
+      out+=shiftEditor(st,d,day,si,prevBoxes);
+    });
+    return out;
   }
 
   return `<div class="cards">
@@ -1419,33 +1438,38 @@ function tabLotto(st){
       <div class="stat"><div class="k">Days logged</div><div class="v">${dates.filter(d=>d.startsWith(month)).length}</div></div>
       <div class="stat"><div class="k">Days with a mismatch</div><div class="v" style="color:${mo.mismatch?'#D62828':'#157F3B'}">${mo.mismatch}</div></div>
     </div>
+    <div class="panel"><div class="ph"><h3>Shifts</h3><span class="hint">Split each day so over/short lands on whoever worked it</span></div>
+      <div class="pb"><div class="fields">
+        <div class="f"><label>Shifts per day</label><select id="ltShifts"><option value="1" ${lottoShiftCount(st)===1?'selected':''}>1 — whole day</option><option value="2" ${lottoShiftCount(st)===2?'selected':''}>2 shifts</option></select></div>
+        ${lottoShiftCount(st)>1?`<div class="f"><label>Shift 1 name</label><input class="in" id="ltName0" value="${esc(lottoShiftName(st,0))}" style="width:150px"></div>
+        <div class="f"><label>Shift 2 name</label><input class="in" id="ltName1" value="${esc(lottoShiftName(st,1))}" style="width:150px"></div>`:''}
+      </div></div></div>
     <div class="panel"><div class="ph"><h3>Lotto machine reconciliation</h3>
       <span class="hint">SOLD = (OPEN − CLOSE) + ADD + ONLINE · the ${slotCount(st)} boxes' price×quantity should sum to CLOSE</span>
       <div class="sp"></div><button class="btn sm" id="lottoCsv">Export CSV</button>
       <button class="btn sm go" id="lottoAdd">Log a day</button></div>
     <div style="overflow-x:auto"><table>
-      <thead><tr><th style="width:120px">Date</th><th style="width:100px">Open</th><th style="width:80px">Add</th>
+      <thead><tr><th style="width:150px">Date</th><th style="width:100px">Open</th><th style="width:80px">Add</th>
         <th style="width:80px">Online</th><th style="width:100px">Close</th><th style="width:100px">Sold</th>
         <th style="width:100px">Box total</th><th style="width:100px">Over/short</th><th style="width:90px"></th></tr></thead>
-      <tbody>${dates.length?dates.map(d=>{const e=st.lotto[d],sold=lottoSold(e),boxTotal=lottoBoxTotal(e),os=lottoOverShort(e);
-        return `<tr ${sold<0?'title="CLOSE is higher than OPEN — likely a fresh roll was loaded; check ADD for that day"':''}>
-          <td class="rno">${d}${sold<0?' ⚠':''}</td>
-          <td class="rno">${esc(e.open)||'—'}</td>
-          <td class="rno">${esc(e.add)||'—'}</td>
-          <td class="rno">${esc(e.online)||'—'}</td>
-          <td class="rno">${e.closeAuto===true?'$'+effClose(e).toFixed(2):(esc(e.close)||'—')}</td>
+      <tbody>${dates.length?dates.map(d=>{const day=st.lotto[d],sold=daySold(day),boxTotal=dayBoxTotal(day),os=dayOverShort(day);
+        return `<tr ${sold<0?'title="CLOSE is higher than OPEN — likely a fresh book was loaded; put its value in ADD"':''}>
+          <td class="rno">${d}${sold<0?' ⚠':''}${day.shifts.length>1?` <span style="color:var(--ink-3)">· ${day.shifts.length} shifts</span>`:''}</td>
+          <td class="rno">$${dayOpen(day).toFixed(2)}</td>
+          <td class="rno">${dayAdd(day)?'$'+dayAdd(day).toFixed(2):'—'}</td>
+          <td class="rno">${dayOnline(day)?'$'+dayOnline(day).toFixed(2):'—'}</td>
+          <td class="rno">$${dayClose(day).toFixed(2)}</td>
           <td class="rno" style="${sold<0?'color:#D62828':''}"><b>$${sold.toFixed(2)}</b></td>
           <td class="rno">$${boxTotal.toFixed(2)}</td>
           <td class="rno" style="color:${osColor(os)}"><b>${os>=0?'+':''}$${os.toFixed(2)}</b></td>
-          <td><button class="btn sm" data-ltedit="${d}">Boxes</button> <button class="btn sm danger" data-ltdel="${d}">×</button></td></tr>`}).join(''):
+          <td><button class="btn sm" data-ltedit="${d}">Open</button> <button class="btn sm danger" data-ltdel="${d}">×</button></td></tr>`}).join(''):
         '<tr><td colspan="9" style="text-align:center;color:var(--ink-3);padding:26px">No days logged yet. Click "Log a day" to start.</td></tr>'}
       </tbody></table></div>
-    <div class="pb"><div class="note"><div><b>Reading this table.</b> <b>Open</b> is where the day starts (it carries over from yesterday's Close). Click <b>Boxes</b>
-      to enter that day's quantities for boxes <b>1–${slotCount(st)}</b> — the same slots, in the same order, as your Games tab, priced from the Games tab.
-      <b>Close</b> then fills in automatically as the total of those boxes (price × quantity). <b>Add</b> is a fresh roll loaded mid-day; <b>Online</b> is any
-      online-lotto adjustment. Want to reconcile against the machine's own meter instead? Just type over <b>Close</b> and <b>Over/short</b> flags any gap.<br><br>
-      <b>Changed the ticket in a box?</b> Update that slot's price on the <b>Games</b> tab — the box here follows it automatically. Put the
-      dollar value of any fresh roll you loaded into that day's <b>Add</b> field so Sold stays accurate instead of showing a false jump.</div></div></div></div>`;
+    <div class="pb"><div class="note"><div><b>How it flows.</b> Each day is one or more shifts. A shift's <b>Open</b> carries from the previous shift's
+      <b>Close</b> (across days too); its <b>Close</b> fills in from that shift's box total automatically. <b>Sold</b> = (Open − Close) + Add + Online, and the
+      boxes 1–${slotCount(st)} mirror your Games slots, priced from the Games tab.<br><br>
+      <b>Loaded a fresh book?</b> Put its dollar value in that shift's <b>Add</b> — Sold stays right even though the box ends with more than it started.
+      <b>Worked a double with no handover?</b> Leave the day at one shift. <b>Two clerks?</b> Give each their own shift so over/short is theirs alone.</div></div></div></div>`;
 }
 function tabStores(st){
   return `<div class="panel"><div class="ph"><h3>Stores</h3><span class="hint">Each store has its own board, games, ads and sales</span>
@@ -1641,9 +1665,9 @@ $('#aBody').addEventListener('input',e=>{
   if(el.dataset.w){st.winners[i][el.dataset.w]=el.value;save();return}
   if(el.dataset.ac&&el.dataset.ac!=='role'){db.accounts[i][el.dataset.ac]=el.value;save();return}
   if(el.dataset.st){const s=db.stores.find(x=>x.id===el.dataset.st);if(s)s.name=el.value;save();return}
-  if(el.dataset.lt){const ee=st.lotto[el.dataset.date];ee[el.dataset.lt]=el.value;if(el.dataset.lt==='close')ee.closeAuto=false;if(el.dataset.lt==='open')ee.openAuto=false;save();return}
-  if(el.dataset.ltqty!=null){st.lotto[el.dataset.date].boxes[+el.dataset.ltqty].qty=el.value;save();return}
-  if(el.dataset.ltprice!=null){st.lotto[el.dataset.date].boxes[+el.dataset.ltprice].price=el.value;save();return}
+  if(el.dataset.lt){const sh=st.lotto[el.dataset.date].shifts[+el.dataset.shift];sh[el.dataset.lt]=el.value;if(el.dataset.lt==='close')sh.closeAuto=false;if(el.dataset.lt==='open')sh.openAuto=false;save();return}
+  if(el.dataset.ltqty!=null){st.lotto[el.dataset.date].shifts[+el.dataset.shift].boxes[+el.dataset.ltqty].qty=el.value;save();return}
+  if(el.dataset.ltclerk!=null){st.lotto[el.dataset.date].shifts[+el.dataset.ltclerk].clerk=el.value;save();return}
   if(el.id==='bT'){st.brand.title=el.value;save()}
   if(el.id==='bS'){st.brand.sub=el.value;save()}
   if(el.id==='bBgVid'){st.brand.bgVideo=el.value;save()}
@@ -1656,7 +1680,9 @@ $('#aBody').addEventListener('change',e=>{
   const st=S(),el=e.target,i=+el.dataset.i;
   if(el.dataset.flag){st.games[i][el.dataset.flag]=el.checked;save();return}
   if(el.dataset.stock!=null){st.games[+el.dataset.stock].status=el.value;save();reRender();return}
-  if(el.dataset.lt||el.dataset.ltqty!=null||el.dataset.ltprice!=null){syncLottoChain(S());save();reRender();return}  // recompute Sold/Over-short + carry Close→next Open once they leave the field
+  if(el.dataset.lt||el.dataset.ltqty!=null){syncLottoChain(S());save();reRender();return}  // recompute Sold/Over-short + carry Close→next Open once they leave the field
+  if(el.id==='ltShifts'){st.view.lottoShifts=Math.min(2,Math.max(1,+el.value||1));save();reRender();return}
+  if(el.id==='ltName0'||el.id==='ltName1'){if(!Array.isArray(st.view.lottoShiftNames))st.view.lottoShiftNames=['Shift 1','Shift 2'];st.view.lottoShiftNames[el.id==='ltName0'?0:1]=el.value;save();reRender();return}
   if(el.id==='bSlots'){st.view.slots=Math.min(40,Math.max(1,+el.value||40));save();reRender()}
   if(el.id==='bCols'){st.view.cols=el.value==='auto'?'auto':+el.value;save();reRender()}
   if(el.id==='bEmpty'){st.view.empty=el.value;save()}
@@ -1769,26 +1795,29 @@ $('#aBody').addEventListener('click',async e=>{
   if(b.id==='lottoAdd'){
     st.lotto=st.lotto||{};
     const d2=new Date().toISOString().slice(0,10);
-    if(st.lotto[d2]){toast('Today is already logged — click Boxes to edit it');return}
-    // chain from the most recent day: Open picks up where that day's Close left off, and
-    // each box's quantity carries forward from yesterday as a starting point; prices
-    // always come live from the Games tab, so there's nothing per-box to seed there
+    if(st.lotto[d2]){toast('Today is already logged — click Open to edit it');return}
+    // chain from the most recent shift: Open picks up where the last Close left off. The
+    // day gets the store's configured number of shifts; the first shift's boxes start from
+    // yesterday's ending counts as a pre-fill; prices always come live from the Games tab
     const prevDate=Object.keys(st.lotto).sort().reverse()[0];
-    const prev=prevDate?st.lotto[prevDate]:null;
-    st.lotto[d2]={open:prev?String(effClose(prev).toFixed(2)):'',openAuto:true,add:'',online:'',close:'',closeAuto:true,
-      boxes:Array.from({length:40},(_,i)=>({qty:prev&&prev.boxes[i]?String(prev.boxes[i].qty??''):''}))};
+    const prevLast=prevDate?dayLast(st.lotto[prevDate]):null;
+    const shifts=[];for(let k=0;k<lottoShiftCount(st);k++)shifts.push(makeShift());
+    if(prevLast)shifts[0].boxes=prevLast.boxes.map(b=>({qty:String(b.qty??'')}));
+    st.lotto[d2]={shifts};syncLottoChain(st);
     save();ltEditDate=d2;reRender();toast('Today added — enter the box quantities; Close fills in from their total');
   }
   if(d.ltedit){ltEditDate=d.ltedit;reRender()}
-  if(d.ltcloseauto){const ee=st.lotto[d.ltcloseauto];if(ee){ee.closeAuto=true;ee.close='';syncLottoChain(st);save();reRender()}}
-  if(d.ltopenauto){const ee=st.lotto[d.ltopenauto];if(ee){ee.openAuto=true;syncLottoChain(st);save();reRender()}}
+  if(d.ltcloseauto!=null&&d.date){const sh=st.lotto[d.date].shifts[+d.ltcloseauto];if(sh){sh.closeAuto=true;sh.close='';syncLottoChain(st);save();reRender()}}
+  if(d.ltopenauto!=null&&d.date){const sh=st.lotto[d.date].shifts[+d.ltopenauto];if(sh){sh.openAuto=true;syncLottoChain(st);save();reRender()}}
+  if(d.ltaddshift){const day=st.lotto[d.ltaddshift];if(day&&day.shifts.length<2){day.shifts.push(makeShift());syncLottoChain(st);save();reRender()}}
+  if(d.ltdelshift!=null&&d.date){const day=st.lotto[d.date];if(day&&day.shifts.length>1){day.shifts.splice(+d.ltdelshift,1);syncLottoChain(st);save();reRender()}}
   if(b.id==='ltBack'){ltEditDate=null;reRender()}
   if(d.ltdel){if(confirm(`Remove the ${d.ltdel} lotto entry?`)){delete st.lotto[d.ltdel];if(ltEditDate===d.ltdel)ltEditDate=null;save();reRender()}}
   if(b.id==='lottoCsv'){
     st.lotto=st.lotto||{};
-    const rows=[['date','open','add','online','close','sold','box_total','over_short']];
-    Object.keys(st.lotto).sort().forEach(d2=>{const e=st.lotto[d2];
-      rows.push([d2,e.open||0,e.add||0,e.online||0,effClose(e).toFixed(2),lottoSold(e).toFixed(2),lottoBoxTotal(e).toFixed(2),lottoOverShort(e).toFixed(2)])});
+    const rows=[['date','shift','clerk','open','add','online','close','sold','box_total','over_short']];
+    Object.keys(st.lotto).sort().forEach(d2=>{dayShifts(st.lotto[d2]).forEach((sh,i)=>{
+      rows.push([d2,lottoShiftName(st,i),(sh.clerk||'').replace(/,/g,' '),(+sh.open||0).toFixed(2),(+sh.add||0).toFixed(2),(+sh.online||0).toFixed(2),effClose(sh).toFixed(2),lottoSold(sh).toFixed(2),lottoBoxTotal(sh).toFixed(2),lottoOverShort(sh).toFixed(2)])})});
     const csv=rows.map(r=>r.join(',')).join('\n');
     const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
     a.download='lotto-reporting.csv';a.click();URL.revokeObjectURL(a.href);toast('CSV exported');
