@@ -1126,13 +1126,47 @@ function logSale(price){
 }
 
 /* ---------------- BACKEND ---------------- */
-let aTab='games';
-const TABS=[['games','Games'],['brand','Branding'],['ads','Advertisements'],['jackpots','Jackpots'],
+let aTab='home';
+const TABS=[['home','Home'],['games','Games'],['brand','Branding'],['ads','Advertisements'],['jackpots','Jackpots'],
   ['winners','Winners'],['sales','Sales'],['lotto','Lotto Reporting'],['stores','Stores & accounts'],['data','Lottery data']];
 /* Stores & accounts (adding/removing stores, managing who can log in) is Owner-only —
    a manager can run their store day to day but can't touch the store list or accounts */
 const visibleTabs=acc=>acc&&acc.role==='owner'?TABS:TABS.filter(([k])=>k!=='stores');
 
+/* Home dashboard: the board at a glance, the actions you do most, and a live list of
+   what needs handling today — each item jumps straight to the right tab */
+function tabHome(st){
+  const fl=st.games.filter(filled);
+  const oos=fl.filter(g=>g.status==='oos'), soon=fl.filter(g=>g.status==='soon'), closing=fl.filter(g=>g.closing);
+  const low=fl.filter(g=>g.prizesLeft!==''&&g.prizesLeft!=null&&+g.prizesLeft<=+st.view.endingAt);
+  const today=new Date().toISOString().slice(0,10), lottoToday=!!(st.lotto&&st.lotto[today]);
+  const nm=a=>esc(a.slice(0,3).map(g=>g.name||('#'+g.no)).join(', ')+(a.length>3?' +'+(a.length-3):''));
+  const items=[];
+  if(oos.length)items.push({c:'#D62828',t:`${oos.length} out of stock`,s:nm(oos),go:'games',b:'Review'});
+  if(closing.length)items.push({c:'#B8860B',t:`${closing.length} closing soon`,s:nm(closing),go:'games',b:'Update'});
+  if(!lottoToday)items.push({c:'#2A6FB0',t:'Lotto not logged today',s:'Keep your daily count current',go:'lotto',b:'Log now'});
+  if(soon.length)items.push({c:'#2A6FB0',t:`${soon.length} marked coming soon`,s:nm(soon),go:'games',b:'Review'});
+  if(low.length)items.push({c:'#B8860B',t:`${low.length} low on top prizes`,s:nm(low),go:'games',b:'Review'});
+  const actions=[['games','Mark out of stock'],['games','Swap / replace'],['lotto','Log lotto shift'],['winners','Post a winner'],['data','New arrival']];
+  return `<div class="cards">
+      <div class="stat"><div class="k">Games on the board</div><div class="v">${fl.length} / 40</div></div>
+      <div class="stat" style="border-left-color:#D62828"><div class="k">Out of stock</div><div class="v" style="color:#D62828">${oos.length}</div></div>
+      <div class="stat" style="border-left-color:#2A6FB0"><div class="k">Coming soon</div><div class="v" style="color:#2A6FB0">${soon.length}</div></div>
+      <div class="stat" style="border-left-color:#B8860B"><div class="k">Closing soon</div><div class="v" style="color:#B8860B">${closing.length}</div></div>
+    </div>
+    <div class="panel"><div class="ph"><h3>Quick actions</h3><span class="hint">The things you do most, one tap away</span></div>
+      <div class="pb"><div style="display:flex;gap:10px;flex-wrap:wrap">
+        ${actions.map(([go,l])=>`<button class="btn" data-goto="${go}" style="flex:1;min-width:130px;padding:15px 10px;font-weight:700">${l}</button>`).join('')}
+      </div></div></div>
+    <div class="panel"><div class="ph"><h3>Needs your attention</h3><span class="hint">${items.length?items.length+' to handle':'all caught up'}</span></div>
+      <div class="pb">${items.length?items.map(it=>`
+        <div style="display:flex;align-items:center;gap:12px;background:var(--sf);border:1px solid var(--bd);border-radius:11px;padding:12px 14px;margin-bottom:8px">
+          <span style="width:11px;height:11px;border-radius:50%;background:${it.c};flex:0 0 auto"></span>
+          <div style="flex:1;min-width:0"><div style="font-weight:700">${it.t}</div><div class="hint" style="margin:0">${it.s}</div></div>
+          <button class="btn sm" data-goto="${it.go}">${it.b}</button>
+        </div>`).join(''):'<div class="note"><div>Nothing needs attention right now — the board is in good shape.</div></div>'}
+      </div></div>`;
+}
 function renderAdmin(){
   const st=S(),acc=currentAccount();
   const tabs=visibleTabs(acc);
@@ -1144,7 +1178,7 @@ function renderAdmin(){
   const myStores=acc.role==='owner'?db.stores:db.stores.filter(s=>accountStoreIds(acc).includes(s.id));
   $('#aStore').innerHTML=myStores.map(s=>`<option value="${s.id}" ${s.id===db.active?'selected':''}>${esc(s.name)}</option>`).join('');
   $('#aTabs').innerHTML=tabs.map(([k,l])=>`<button class="vtab ${aTab===k?'on':''}" data-tab="${k}">${l}</button>`).join('');
-  $('#aBody').innerHTML=({games:tabGames,brand:tabBrand,ads:tabAds,jackpots:tabJp,winners:tabWin,
+  $('#aBody').innerHTML=({home:tabHome,games:tabGames,brand:tabBrand,ads:tabAds,jackpots:tabJp,winners:tabWin,
     sales:tabSales,lotto:tabLotto,stores:tabStores,data:tabData}[aTab]||tabGames)(st);
 }
 function tabGames(st){
@@ -1773,6 +1807,7 @@ $('#aBody').addEventListener('change',e=>{
 });
 $('#aBody').addEventListener('click',async e=>{
   const st=S(),b=e.target.closest('button');if(!b)return;const d=b.dataset,i=+(d.pick??d.link??d.wipe??d.adpick??d.adlink??d.adnoimg??d.addel??d.jpdel??d.wdel??d.acdel);
+  if(d.goto){aTab=d.goto;renderAdmin();return}   // Home dashboard: jump to a tab
 
   if(d.pick!=null){const img=await pickImage();if(img){st.games[i].img=img;save();reRender();toast('Picture added')}}
   if(d.link!=null){const u=askLink(st.games[i].img);if(u!==null){st.games[i].img=u;save();reRender();toast(u?'Picture linked':'Picture cleared')}}
