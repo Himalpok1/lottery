@@ -247,6 +247,39 @@ button{font-family:inherit}
 .cbtn2.ghost{background:#fff;color:#D62828;border:1.5px solid #CFD4DC}
 .cbtn2.ghost:hover{border-color:#D62828;background:#FDECEC}
 
+/* counter: section tabs + the mobile Lotto shift-entry screen */
+.ctabs{display:flex;gap:6px;margin-bottom:14px}
+.ctab{flex:1;padding:9px;font-size:12.5px;font-weight:700;border-radius:11px;border:1.5px solid #CFD4DC;
+  background:#fff;color:#5B6472;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}
+.ctab .ic{font-size:17px;line-height:1}
+.ctab.on{background:#FDECEC;border-color:#D62828;color:#D62828}
+.cshifts{display:flex;gap:6px;margin-bottom:14px}
+.cshift{flex:1;padding:9px;font-size:13px;font-weight:700;border-radius:11px;border:1.5px solid #CFD4DC;
+  background:#fff;color:#5B6472;cursor:pointer}
+.cshift.on{background:#D62828;border-color:#D62828;color:#fff}
+.cmeter{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cmeter .mf label{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:#8A93A1;
+  font-weight:700;display:block;margin-bottom:4px}
+.cmeter .mf .v{font-size:16px;font-weight:800;font-family:var(--mono)}
+.cmeter .mf input{width:100%;height:34px;padding:0 10px;border:1.5px solid #CFD4DC;border-radius:9px;
+  font-family:var(--mono);font-weight:700;font-size:13px;background:#fff;color:#14171F}
+.cmeter .mf input:focus{border-color:#D62828;outline:none}
+.cos{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:11px;
+  margin-bottom:14px;font-weight:700;font-size:12.5px}
+.csearch{width:100%;height:32px;padding:0 10px;border:1.5px solid #CFD4DC;border-radius:9px;
+  font-size:12.5px;margin-bottom:8px;background:#fff;color:#14171F}
+.cboxrow{display:flex;align-items:center;gap:10px;padding:8px 10px;background:#F7F8FA;border-radius:9px;margin-bottom:6px}
+.cboxrow .no{width:22px;font-size:12px;color:#8A93A1;font-weight:700;flex:0 0 auto}
+.cboxrow .nm{flex:1;min-width:0}
+.cboxrow .nm .g{font-size:13px;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cboxrow .nm .p{font-size:11px;color:#8A93A1;margin:0}
+.cboxrow input{width:56px;height:32px;text-align:center;font-family:var(--mono);font-weight:700;
+  font-size:13px;border:1.5px solid #CFD4DC;border-radius:8px;background:#fff;color:#14171F;flex:0 0 auto}
+.cboxrow input:focus{border-color:#D62828;outline:none}
+.cboxrow .delta{width:44px;text-align:right;font-size:11px;flex:0 0 auto}
+.cboxrow.out input{border-color:#D9534F}
+.cboxrow.newbook{background:#FDF3E3}
+
 /* ============ BACKEND — red & white ============ */
 :root{
   --r:#D62828;        /* the red */
@@ -408,42 +441,54 @@ tr:hover td{background:var(--r-lt)}
 <div id="counter" class="hidden">
   <div class="cwrap">
     <div class="chead">
-      <h2>Show tickets on screen</h2>
-      <span class="st" id="cStatus">SHOWING ALL</span>
+      <h2 id="cHeadline">Lotto shift entry</h2>
+      <span class="st" id="cStatus"></span>
     </div>
     <div class="lwho" style="margin:-8px 0 16px"><span>Signed in as <b id="cWho"></b></span>
       <span class="sp"></span><button class="btn sm" id="cSignOut">Sign out</button></div>
 
-    <div class="csec">
-      <h3>By price</h3>
-      <div class="cgrid" id="cPrices"></div>
+    <div class="ctabs" id="cTabs">
+      <button class="ctab" data-ctab="lotto"><span class="ic">🎰</span>Lotto</button>
+      <button class="ctab" data-ctab="board"><span class="ic">📺</span>Board</button>
+      <button class="ctab" data-ctab="sales"><span class="ic">💵</span>Sales</button>
     </div>
 
-    <div class="csec">
-      <h3>Quick views</h3>
-      <div class="cgrid two">
-        <button class="cb" data-mode="new"><span class="ic">🆕</span>New tickets</button>
-        <button class="cb" data-mode="lucky"><span class="ic">🍀</span>Lucky tickets</button>
-        <button class="cb" data-mode="ending"><span class="ic">⌛</span>Ending tickets</button>
-        <button class="cb" data-mode="recommended"><span class="ic">⭐</span>Recommended game</button>
-        <button class="cb" data-mode="slots"><span class="ic">🎯</span>Recommended slots</button>
-        <button class="cb" data-mode="all"><span class="ic">▦</span>Show all 40</button>
+    <div id="cLotto"></div>
+
+    <div id="cBoard" class="hidden">
+      <div class="csec">
+        <h3>By price</h3>
+        <div class="cgrid" id="cPrices"></div>
+      </div>
+
+      <div class="csec">
+        <h3>Quick views</h3>
+        <div class="cgrid two">
+          <button class="cb" data-mode="new"><span class="ic">🆕</span>New tickets</button>
+          <button class="cb" data-mode="lucky"><span class="ic">🍀</span>Lucky tickets</button>
+          <button class="cb" data-mode="ending"><span class="ic">⌛</span>Ending tickets</button>
+          <button class="cb" data-mode="recommended"><span class="ic">⭐</span>Recommended game</button>
+          <button class="cb" data-mode="slots"><span class="ic">🎯</span>Recommended slots</button>
+          <button class="cb" data-mode="all"><span class="ic">▦</span>Show all 40</button>
+        </div>
+      </div>
+
+      <div class="csec">
+        <h3>Ticket on number</h3>
+        <div class="cnum">
+          <input id="cNum" inputmode="numeric" placeholder="Slot no." maxlength="4">
+          <button class="cbtn2" id="cNumGo">Show</button>
+          <button class="cbtn2 ghost" id="cBack">Back to all</button>
+        </div>
       </div>
     </div>
 
-    <div class="csec">
-      <h3>Ticket on number</h3>
-      <div class="cnum">
-        <input id="cNum" inputmode="numeric" placeholder="Slot no." maxlength="4">
-        <button class="cbtn2" id="cNumGo">Show</button>
-        <button class="cbtn2 ghost" id="cBack">Back to all</button>
+    <div id="cSales" class="hidden">
+      <div class="csec">
+        <h3>Log a sale</h3>
+        <div class="cgrid" id="cSell"></div>
+        <div style="margin-top:10px;font-size:12.5px;color:var(--ink-3)">Tap a price to record one ticket sold today. Totals show in the backend under Sales.</div>
       </div>
-    </div>
-
-    <div class="csec">
-      <h3>Log a sale</h3>
-      <div class="cgrid" id="cSell"></div>
-      <div style="margin-top:10px;font-size:12.5px;color:var(--ink-3)">Tap a price to record one ticket sold today. Totals show in the backend under Sales.</div>
     </div>
 
     <div style="display:flex;gap:8px">
@@ -1104,9 +1149,24 @@ function pushCmd(mode,value=''){
   save();renderCounter();
   if(!location.hash||location.hash==='#board')renderBoard();
 }
+let cTab='lotto',cShiftIdx=0,cBoxFilter='';
+const CTAB_LABEL={lotto:'Lotto shift entry',board:'Show tickets on screen',sales:'Log a sale'};
 function renderCounter(){
   const st=S(),cmd=db.cmd||{mode:'all'},acc=currentAccount();
   $('#cWho').textContent=acc?`${acc.name} (${acc.role})`:'';
+  $('#cHeadline').textContent=CTAB_LABEL[cTab];
+  $$('#cTabs [data-ctab]').forEach(b=>b.classList.toggle('on',b.dataset.ctab===cTab));
+  $('#cLotto').classList.toggle('hidden',cTab!=='lotto');
+  $('#cBoard').classList.toggle('hidden',cTab!=='board');
+  $('#cSales').classList.toggle('hidden',cTab!=='sales');
+
+  if(cTab==='lotto'){
+    $('#cStatus').textContent='';
+    ensureTodayLotto(st);
+    $('#cLotto').innerHTML=counterLottoView(st);
+    return;
+  }
+
   const used=[...new Set(st.games.filter(filled).map(g=>+g.price).filter(Boolean))].sort((a,b)=>a-b);
   $('#cPrices').innerHTML=(used.length?used:[1,2,5,10]).map(p=>
     `<button class="cb ${cmd.mode==='price'&&+cmd.value===p?'on':''}" data-price="${p}"><span class="pz">$${p}</span></button>`).join('');
@@ -1115,7 +1175,93 @@ function renderCounter(){
   $$('#counter [data-mode]').forEach(b=>b.classList.toggle('on',b.dataset.mode===cmd.mode));
   const label={all:'SHOWING ALL',price:'SHOWING $'+cmd.value,new:'NEW TICKETS',lucky:'LUCKY TICKETS',
     ending:'ENDING TICKETS',recommended:'RECOMMENDED',slots:'RECOMMENDED SLOTS',number:'TICKET '+cmd.value}[cmd.mode]||'SHOWING ALL';
-  $('#cStatus').textContent=label;
+  $('#cStatus').textContent=cTab==='board'?label:'';
+}
+/* today's lotto entry, auto-created the same way the Backend's "Log a day" does —
+   the counter shouldn't make a clerk go find that button */
+function ensureTodayLotto(st){
+  st.lotto=st.lotto||{};
+  const d2=new Date().toISOString().slice(0,10);
+  if(st.lotto[d2])return;
+  const prevDate=Object.keys(st.lotto).sort().reverse()[0];
+  const prevLast=prevDate?dayLast(st.lotto[prevDate]):null;
+  const shifts=[];for(let k=0;k<lottoShiftCount(st);k++)shifts.push(makeShift());
+  if(prevLast){
+    shifts[0].boxes=prevLast.boxes.map(b=>({game:String(b.game??''),price:String(b.price??''),qty:String(b.qty??'')}));
+    promoteNewBooks(st,prevLast,shifts[0]);
+  }
+  st.lotto[d2]={shifts};syncLottoChain(st);save();
+}
+/* mobile shift-entry screen: shift picker, meter card, then the box list with a
+   jump-to-box search — same data-lt/data-ltqty attributes as the Backend's shiftEditor,
+   so the existing input/change/click handlers drive both without duplicating logic */
+function counterLottoView(st){
+  const d=new Date().toISOString().slice(0,10),day=st.lotto[d];
+  if(!day)return '<div class="csec">Nothing to log yet today.</div>';
+  const shifts=dayShifts(day),cfg=lottoShiftCount(st);
+  if(cShiftIdx>=shifts.length)cShiftIdx=shifts.length-1;
+  const si=cShiftIdx,sh=shifts[si];
+  const prevDate=Object.keys(st.lotto).filter(x=>x<d).sort().reverse()[0];
+  const prevDayLast=prevDate?dayLast(st.lotto[prevDate]):null;
+  const prevBoxes=si>0?shifts[si-1].boxes:(prevDayLast?prevDayLast.boxes:null);
+  const sold=lottoSold(sh),boxTotal=lottoBoxTotal(sh),os=lottoOverShort(sh);
+  const osBg=os===0?'#E7F5EC':Math.abs(os)<20?'#FDF3E3':'#FDECEC';
+  const osFg=os===0?'#157F3B':Math.abs(os)<20?'#8A5A00':'#D9534F';
+  const hasPrev=si>0||Object.keys(st.lotto).some(x=>x<d),openAuto=sh.openAuto!==false;
+  const n=slotCount(st);
+  const q=cBoxFilter.trim().toLowerCase();
+  const rows=sh.boxes.slice(0,n).map((b,i)=>({b,i})).filter(({b,i})=>{
+    if(!q)return true;
+    return String(i+1).includes(q)||(b.game||'').toLowerCase().includes(q);
+  });
+  const enteredCount=sh.boxes.slice(0,n).filter(b=>b.qty!=='').length;
+
+  return `
+    ${cfg>1?`<div class="cshifts">${shifts.map((s,i)=>`<button class="cshift ${i===si?'on':''}" data-cshift="${i}">${esc(lottoShiftName(st,i))}</button>`).join('')}
+      ${shifts.length<2?`<button class="cshift" data-ltaddshift="${d}">+ Add</button>`:''}</div>`:''}
+
+    <div class="csec">
+      <h3>Clerk</h3>
+      <input class="in" data-ltclerk="${si}" data-date="${d}" value="${esc(sh.clerk||'')}" placeholder="Who's working this shift"
+        style="width:100%;height:36px;padding:0 10px;border:1.5px solid #CFD4DC;border-radius:9px;font-size:13px">
+    </div>
+
+    <div class="csec">
+      <h3>Meter</h3>
+      <div class="cmeter">
+        <div class="mf"><label>Open ${hasPrev?(openAuto?'<span style="color:#157F3B">auto</span>':''):''}</label>
+          <div class="v">$${(+sh.open||0).toFixed(2)}</div></div>
+        <div class="mf"><label>Close (from boxes)</label><div class="v" style="color:#D62828">$${boxTotal.toFixed(2)}</div></div>
+        <div class="mf"><label>Add</label><input inputmode="decimal" data-lt="add" data-shift="${si}" data-date="${d}" value="${esc(sh.add)}" placeholder="0"></div>
+        <div class="mf"><label>Online</label><input inputmode="decimal" data-lt="online" data-shift="${si}" data-date="${d}" value="${esc(sh.online)}" placeholder="0"></div>
+      </div>
+    </div>
+
+    <div class="cos" style="background:${osBg};color:${osFg}">
+      <span>${os===0?'Box total matches close':Math.abs(os)<20?'Small mismatch':'Over / short'}</span>
+      <span>${os>=0?'+':''}$${os.toFixed(2)}</span>
+    </div>
+
+    <div class="csec">
+      <h3>Boxes — ${enteredCount} of ${n} entered</h3>
+      <input class="csearch" id="cBoxSearch" value="${esc(cBoxFilter)}" placeholder="Jump to box # or game name">
+      ${rows.map(({b,i})=>{
+        const g=st.games[i]||{};
+        const prevB=prevBoxes?prevBoxes[i]:null;
+        const priceChanged=prevB&&prevB.price!==''&&b.price!==''&&+prevB.price!==+b.price;
+        const delta=(!priceChanged&&prevB&&prevB.qty!==''&&b.qty!=='')?(+prevB.qty||0)-(+b.qty||0):null;
+        const out=b.qty!==''&&+b.qty===0;
+        const name=b.game?b.game:(g.name||'— empty slot —');
+        const price=(b.price!==undefined&&b.price!=='')?b.price:(g.price!==''&&g.price!=null?g.price:'');
+        return `<div class="cboxrow ${out?'out':''} ${priceChanged?'newbook':''}">
+          <span class="no">${i+1}</span>
+          <div class="nm"><p class="g">${esc(name)}</p><p class="p">${price?'$'+esc(price):'—'}${priceChanged?' · new book':''}</p></div>
+          <input inputmode="numeric" data-ltqty="${i}" data-shift="${si}" data-date="${d}" value="${esc(b.qty)}" placeholder="0">
+          <span class="delta" style="color:${priceChanged?'#8A93A1':delta==null?'#8A93A1':delta>0?'#157F3B':delta<0?'#B8860B':'#8A93A1'}">
+            ${priceChanged?'new':delta==null?'—':delta===0?'0':(delta>0?'−'+delta:'+'+Math.abs(delta))}</span>
+        </div>`;
+      }).join('')||'<div style="text-align:center;color:#8A93A1;font-size:12.5px;padding:14px">No boxes match.</div>'}
+    </div>`;
 }
 function logSale(price){
   const st=S(),d=new Date().toISOString().slice(0,10);
@@ -1722,11 +1868,16 @@ function txAutoFill(st){
 }
 
 /* ---------------- admin wiring (delegated) ---------------- */
-function reRender(){renderAdmin()}
+/* the counter's Lotto tab reuses this same delegated logic (see the shared
+   input/change/click listeners below, attached to both #aBody and #cLotto) —
+   so reRender needs to redraw whichever of the two is actually on screen */
+function reRender(){location.hash==='#counter'?renderCounter():renderAdmin()}
 $('#aTabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(!b)return;aTab=b.dataset.tab;renderAdmin()});
 $('#aStore').addEventListener('change',e=>{db.active=e.target.value;save();renderAdmin()});
 
-$('#aBody').addEventListener('input',e=>{
+/* shared by the Backend's #aBody and the counter's #cLotto — same data-* attributes
+   drive both, so one set of handlers can save either without duplicating logic */
+function bodyInputHandler(e){
   const st=S(),el=e.target,i=+el.dataset.i;
   if(el.dataset.f!=null&&el.dataset.i!=null){st.games[i][el.dataset.f]=el.value;save();return}
   if(el.dataset.ad){st.ads[i][el.dataset.ad]=el.value;save();return}
@@ -1745,8 +1896,12 @@ $('#aBody').addEventListener('input',e=>{
   if(el.id==='adSecs'){st.view.adSecs=+el.value||8;save()}
   if(el.id==='txQ'){txQ=el.value;const c=el.selectionStart;renderAdmin();
     const n=$('#txQ');if(n){n.focus();n.setSelectionRange(c,c)}}
-});
-$('#aBody').addEventListener('change',e=>{
+  if(el.id==='cBoxSearch'){cBoxFilter=el.value;const c=el.selectionStart;renderCounter();
+    const n=$('#cBoxSearch');if(n){n.focus();n.setSelectionRange(c,c)}}
+}
+$('#aBody').addEventListener('input',bodyInputHandler);
+$('#cLotto').addEventListener('input',bodyInputHandler);
+function bodyChangeHandler(e){
   const st=S(),el=e.target,i=+el.dataset.i;
   if(el.dataset.flag){st.games[i][el.dataset.flag]=el.checked;save();return}
   if(el.dataset.stock!=null){st.games[+el.dataset.stock].status=el.value;save();reRender();return}
@@ -1807,8 +1962,10 @@ $('#aBody').addEventListener('change',e=>{
       ? `Slot ${String(onBoardAt+1).padStart(2,'0')} ↔ ${String(idx+1).padStart(2,'0')}`
       : `#${no} → slot ${String(idx+1).padStart(2,'0')}`);
   }
-});
-$('#aBody').addEventListener('click',async e=>{
+}
+$('#aBody').addEventListener('change',bodyChangeHandler);
+$('#cLotto').addEventListener('change',bodyChangeHandler);
+async function bodyClickHandler(e){
   const st=S(),b=e.target.closest('button');if(!b)return;const d=b.dataset,i=+(d.pick??d.link??d.wipe??d.adpick??d.adlink??d.adnoimg??d.addel??d.jpdel??d.wdel??d.acdel);
   if(d.goto){aTab=d.goto;renderAdmin();return}   // Home dashboard: jump to a tab
 
@@ -1945,9 +2102,16 @@ $('#aBody').addEventListener('click',async e=>{
       save();reRender();toast(`${arr.length} games loaded · ${n.upd} on your board updated`);
     }catch(_){toast('That is not a valid JSON array of games')}
   }
-});
+  if(d.cshift!=null){cShiftIdx=+d.cshift;renderCounter()}
+}
+$('#aBody').addEventListener('click',bodyClickHandler);
+$('#cLotto').addEventListener('click',bodyClickHandler);
 
 /* ---------------- counter wiring ---------------- */
+$('#cTabs').addEventListener('click',e=>{
+  const b=e.target.closest('[data-ctab]');if(!b)return;
+  cTab=b.dataset.ctab;renderCounter();
+});
 $('#counter').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
   if(b.dataset.price)pushCmd('price',+b.dataset.price);

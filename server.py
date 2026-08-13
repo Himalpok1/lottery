@@ -211,10 +211,22 @@ def account_can_admin(a):
     return bool(a) and a.get("role") in ("owner", "manager")
 
 
+CLERK_SAFE_KEYS = {
+    "sales",  # counter app: log a sale
+    "lotto",  # counter app: shift meter + box quantities
+    # a shift's staged "new books" get promoted into the Games slots the next time
+    # anyone opens the Lotto tab for a new day (see ensureTodayLotto in index.html) —
+    # a clerk doing that ordinary action must be allowed to carry that games change too
+    "games",
+}
+
+
 def clerk_write_ok(old, new):
-    """A clerk may only touch: which slot's command is showing (top-level cmd) and a
-    store's daily sales tally. Everything else — games, ads, jackpots, branding, the
-    account list itself, even which store is active — must come through unchanged."""
+    """A clerk may only touch: which slot's command is showing (top-level cmd), a
+    store's daily sales tally, its Lotto shift data, and — only as a side effect of
+    opening a new Lotto day — the Games slots a staged new book promotes into.
+    Everything else — ads, jackpots, branding, the account list itself, even which
+    store is active — must come through unchanged."""
     if not old:
         return False
     if old.get("active") != new.get("active"):
@@ -230,7 +242,7 @@ def clerk_write_ok(old, new):
         if set(os_.keys()) != set(ns.keys()):
             return False
         for key in os_:
-            if key == "sales":
+            if key in CLERK_SAFE_KEYS:
                 continue
             if os_.get(key) != ns.get(key):
                 return False
