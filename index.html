@@ -800,7 +800,7 @@ const newStore=(name)=>({
   id:'s'+Math.random().toString(36).slice(2,8),name,
   brand:{title:name,sub:'Scratch-Offs',logo:'',theme:'texas',accent:'#D62828',
          bgType:'theme',bgImage:'',bgVideo:''},
-  view:{cols:'auto',empty:'show',sort:'slot',endingAt:3,tile:'card',slots:40,lottoShifts:1,lottoShiftNames:['Shift 1','Shift 2'],showJp:true,showDraws:true,showAds:true,showWinners:true,adSecs:8},
+  view:{cols:'auto',empty:'show',sort:'slot',endingAt:3,tile:'card',slots:40,lottoShifts:1,lottoShiftNames:['Shift 1','Shift 2'],showJp:false,showDraws:true,showAds:true,showWinners:false,adSecs:8},
   games:blankGames(),ads:[],jackpots:[],winners:[],sales:{},lotto:{},lottoBoxPrices:[...LOTTO_BOX_PRICES],feedUrl:''
 });
 const fresh=()=>{const s=newStore('Swing by Maypearl');return{stores:[s],active:s.id,
@@ -815,6 +815,7 @@ const normalizeDb=d=>{
   (d.stores||[]).forEach(s=>{
     (s.games||[]).forEach(g=>{if(typeof g.status!=='string')g.status=''});  // stock override added later
     if(!s.lotto||typeof s.lotto!=='object')s.lotto={};
+    if(s.view){s.view.showJp=false;s.view.showWinners=false}  // Jackpots/Winners tabs retired — keep the TV strips off too
     if(!(+((s.view||{}).lottoShifts)))((s.view=s.view||{}).lottoShifts=1);
     if(!Array.isArray((s.view||{}).lottoShiftNames))s.view.lottoShiftNames=['Shift 1','Shift 2'];
     // Boxes mirror the 40 game slots 1-to-1 (box i IS slot i, priced from the Games tab).
@@ -1272,8 +1273,8 @@ function logSale(price){
 
 /* ---------------- BACKEND ---------------- */
 let aTab='home';
-const TABS=[['home','Home'],['games','Games'],['brand','Branding'],['ads','Advertisements'],['jackpots','Jackpots'],
-  ['winners','Winners'],['sales','Sales'],['lotto','Lotto Reporting'],['stores','Stores & accounts'],['data','Lottery data']];
+const TABS=[['home','Home'],['games','Games'],['brand','Branding'],['ads','Advertisements'],
+  ['sales','Sales'],['lotto','Lotto Reporting'],['stores','Stores & accounts'],['data','Lottery data']];
 /* Stores & accounts (adding/removing stores, managing who can log in) is Owner-only —
    a manager can run their store day to day but can't touch the store list or accounts */
 const visibleTabs=acc=>acc&&acc.role==='owner'?TABS:TABS.filter(([k])=>k!=='stores');
@@ -1292,7 +1293,7 @@ function tabHome(st){
   if(!lottoToday)items.push({c:'#2A6FB0',t:'Lotto not logged today',s:'Keep your daily count current',go:'lotto',b:'Log now'});
   if(soon.length)items.push({c:'#2A6FB0',t:`${soon.length} marked coming soon`,s:nm(soon),go:'games',b:'Review'});
   if(low.length)items.push({c:'#B8860B',t:`${low.length} low on top prizes`,s:nm(low),go:'games',b:'Review'});
-  const actions=[['games','Mark out of stock'],['games','Swap / replace'],['lotto','Log lotto shift'],['winners','Post a winner'],['data','New arrival']];
+  const actions=[['games','Mark out of stock'],['games','Swap / replace'],['lotto','Log lotto shift'],['data','New arrival']];
   return `<div class="cards">
       <div class="stat"><div class="k">Games on the board</div><div class="v">${fl.length} / 40</div></div>
       <div class="stat" style="border-left-color:#D62828"><div class="k">Out of stock</div><div class="v" style="color:#D62828">${oos.length}</div></div>
