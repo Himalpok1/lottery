@@ -393,6 +393,17 @@ tr:hover td{background:var(--r-lt)}
   align-items:center;justify-content:center;overflow:hidden;flex:0 0 auto}
 .thumb img{width:100%;height:100%;object-fit:contain}
 .thumb.none{border-style:dashed;color:var(--ink-3);font-size:8.5px;font-family:var(--mono);text-align:center}
+/* Games table — its own header/thumb/pill treatment, scoped so it doesn't bleed into every other table */
+.gTable thead th{background:var(--r);color:#fff;font-size:10.5px;letter-spacing:.08em;border-bottom:none;white-space:nowrap}
+.gTable tbody tr:nth-child(even) td{background:var(--sf-2)}
+.gTable tbody tr:hover td{background:var(--r-lt)}
+.gThumb{width:54px;height:54px;border-radius:8px;background:var(--sf-2);border:1px solid var(--bd);display:flex;
+  align-items:center;justify-content:center;overflow:hidden;flex:0 0 auto}
+.gThumb img{width:100%;height:100%;object-fit:cover}
+.gThumb.none{border-style:dashed;color:var(--ink-3);font-size:8.5px;font-family:var(--mono);text-align:center}
+.pill{border-radius:20px;border:none;font-weight:700;font-size:12px;padding:6px 10px}
+.gFoot{display:flex;align-items:center;gap:14px;padding:10px 14px;border-top:1px solid var(--bd);
+  font-family:var(--mono);font-size:11.5px;color:var(--ink-3)}
 .imgcell{display:flex;align-items:center;gap:8px}
 .chk{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-2);white-space:nowrap}
 .chk input{accent-color:var(--r)}
@@ -1379,7 +1390,18 @@ const visibleTabs=acc=>TABS;
    Settings = Branding + Stores & accounts, one below the other — the store list and
    accounts are Owner-only, so a manager sees Branding but not that section. */
 function tabSalesAndInsights(st){return tabSales(st)+tabInsights(st)}
-function tabSettings(st){const acc=currentAccount();return tabBrand(st)+(acc&&acc.role==='owner'?tabStores(st):'')}
+/* Settings groups Branding + TV layout + Stores&accounts under sub-tabs instead of one long
+   stack of panels — each group shows on its own, Stores&accounts staying Owner-only. */
+let settingsSub='brand';
+function tabSettings(st){
+  const acc=currentAccount(),isOwner=acc&&acc.role==='owner';
+  const groups=[['brand','Branding'],['layout','TV layout'],...(isOwner?[['accounts','Stores & accounts']]:[])];
+  if(!groups.some(([k])=>k===settingsSub))settingsSub=groups[0][0];
+  const nav=`<div style="display:flex;gap:8px;margin-bottom:16px">${groups.map(([k,l])=>
+    `<button class="btn sm ${settingsSub===k?'go':''}" data-subtab="${k}">${l}</button>`).join('')}</div>`;
+  const body=settingsSub==='layout'?tabBrandLayout(st):settingsSub==='accounts'&&isOwner?tabStores(st):tabBrandIdentity(st);
+  return nav+body;
+}
 
 /* Home dashboard: the board at a glance, the actions you do most, and a live list of
    what needs handling today — each item jumps straight to the right tab */
@@ -1453,17 +1475,19 @@ function renderAdmin(){
 }
 function tabGames(st){
   const n=slotCount(st);
+  const filledCount=st.games.slice(0,n).filter(filled).length;
+  const statusPill=s=>s==='oos'?{bg:'#FDECEC',c:'#B02A2A',l:'Out of stock'}:s==='soon'?{bg:'#E8F1FC',c:'#2A6FB0',l:'Coming soon'}:{bg:'#E8F7EE',c:'#157F3B',l:'In stock'};
   return `<div class="panel">
-    <div class="ph"><h3>The ${n} games</h3>
-      <span class="hint">Game no. + name + price + picture. "Prizes left" drives ONLY N LEFT; "Current" is the ticket you're on in the pack.</span>
-      <div class="sp"></div><span class="hint" style="color:var(--r);font-family:var(--mono);font-weight:800">${st.games.slice(0,n).filter(filled).length} of ${n} filled</span>
+    <div class="ph">${icon('tag',20)}<div><h3 style="margin:0">The ${n} games</h3>
+      <span class="hint" style="margin:0">Game no. + name + price + picture. "Prizes left" drives ONLY N LEFT; "Current" is the ticket you're on in the pack.</span></div>
+      <div class="sp"></div><span class="pill" style="background:var(--r-lt);color:var(--r)">${filledCount} of ${n} filled</span>
       <button class="btn sm danger" id="gClear">Clear all</button></div>
-    <div style="overflow-x:auto"><table>
+    <div style="overflow-x:auto"><table class="gTable">
       <thead><tr><th style="width:64px">Slot</th><th style="width:72px">Game no.</th><th>Game name</th>
         <th style="width:82px">Price</th><th style="width:74px">Prizes left</th><th style="width:74px">Current</th>
-        <th style="width:190px">Flags</th><th style="width:140px">Swap</th><th style="width:170px">Assign from catalog</th>
-        <th style="width:200px">Picture</th><th style="width:60px"></th></tr></thead>
-      <tbody>${st.games.slice(0,n).map((g,i)=>`<tr>
+        <th style="width:130px">Status</th><th style="width:140px">Swap</th><th style="width:170px">Assign from catalog</th>
+        <th style="width:150px">Picture</th><th style="width:70px">Action</th></tr></thead>
+      <tbody>${st.games.slice(0,n).map((g,i)=>{const sp=statusPill(g.status);return`<tr>
         <td><div style="display:flex;align-items:center;gap:5px">
           <span class="rno" style="font-size:14px">${String(g.slot).padStart(2,'0')}</span>
           <div style="display:flex;flex-direction:column;gap:2px">
@@ -1476,16 +1500,11 @@ function tabGames(st){
           ${PRICES.map(p=>`<option value="${p}" ${+g.price===p?'selected':''}>$${p}</option>`).join('')}</select></td>
         <td><input class="in mono" data-f="prizesLeft" data-i="${i}" value="${esc(g.prizesLeft)}" placeholder="—"></td>
         <td><input class="in mono" data-f="current" data-i="${i}" value="${esc(g.current)}" placeholder="—"></td>
-        <td><div style="display:flex;flex-direction:column;gap:6px">
-          <div style="display:flex;gap:9px">
-          <label class="chk"><input type="checkbox" data-flag="isNew" data-i="${i}" ${g.isNew?'checked':''}>New</label>
-          <label class="chk"><input type="checkbox" data-flag="isLucky" data-i="${i}" ${g.isLucky?'checked':''}>Lucky</label>
-          <label class="chk" title="${esc(g.endDate?'Ends '+g.endDate:'')}"><input type="checkbox" data-flag="closing" data-i="${i}" ${g.closing?'checked':''}>Closing</label></div>
-          <select class="in mono" data-stock="${i}" title="Show this box as Out of Stock or Coming Soon on the TV" style="font-size:12px">
-            <option value="">In stock</option>
+        <td><select class="pill mono" data-stock="${i}" title="Show this box as Out of Stock or Coming Soon on the TV" style="background:${sp.bg};color:${sp.c};width:100%">
+            <option value="" ${!g.status?'selected':''}>In stock</option>
             <option value="oos" ${g.status==='oos'?'selected':''}>Out of stock</option>
             <option value="soon" ${g.status==='soon'?'selected':''}>Coming soon</option>
-          </select></div></td>
+          </select></td>
         <td><select class="in mono" data-swap="${i}" style="width:130px;font-size:12px">
           <option value="">Swap with…</option>
           ${st.games.slice(0,n).map((s,j)=>j===i?'':`<option value="${j}">${String(s.slot).padStart(2,'0')} · ${filled(s)?esc(s.name.slice(0,14)):'open'}</option>`).join('')}
@@ -1495,12 +1514,15 @@ function tabGames(st){
           ${TX.map(t=>{const at=st.games.findIndex(x=>String(x.no)===t.no);
             return `<option value="${t.no}">${esc(t.no)} · ${esc(t.name.slice(0,20))} ($${t.price})${at>=0?' — on '+String(at+1).padStart(2,'0'):''}</option>`}).join('')}
         </select></td>
-        <td><div class="imgcell">
-          <div class="thumb ${g.img?'':'none'}">${g.img?`<img src="${esc(imgSrc(g.img))}">`:'no pic'}</div>
-          <button class="btn sm" data-pick="${i}">Choose</button>
-          <button class="btn sm" data-link="${i}">Link</button></div></td>
-        <td>${filled(g)?`<button class="btn sm danger" data-wipe="${i}">Clear</button>`:''}</td></tr>`).join('')}
-      </tbody></table></div>
+        <td><div style="display:flex;align-items:center;gap:8px">
+          <div class="gThumb ${g.img?'':'none'}">${g.img?`<img src="${esc(imgSrc(g.img))}">`:'no pic'}</div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <button class="btn sm go" data-pick="${i}">Choose</button>
+            <button class="btn sm" data-link="${i}">Link</button></div></div></td>
+        <td>${filled(g)?`<button class="btn sm danger" data-wipe="${i}" title="Clear this slot">Clear</button>`:''}</td></tr>`}).join('')}
+      </tbody></table>
+      <div class="gFoot">Total slots <b style="color:var(--ink)">${n}</b><span class="sp"></span>Click Choose to assign a ticket</div>
+    </div>
     <div class="pb"><div class="note"><div><b>The two numbers.</b> <b>Prizes left</b> is how many top prizes the state still shows
       for that game — when it drops to your "ending" threshold the tile turns red and reads ONLY N LEFT.
       <b>Current</b> is the ticket number you're on in the open pack, shown small on the right of each tile.<br><br>
@@ -1508,7 +1530,7 @@ function tabGames(st){
       <b>Lottery data</b> tab. If that game is already sitting in another slot, the two slots simply swap.</div></div></div>
   </div>`;
 }
-function tabBrand(st){
+function tabBrandIdentity(st){
   const b=st.brand,t=THEMES[b.theme]||THEMES.texas;
   return `<div class="panel"><div class="ph"><h3>Store identity</h3><span class="hint">What the TV shows in its top bar</span></div>
     <div class="pb">
@@ -1573,9 +1595,10 @@ function tabBrand(st){
       </div>
       <div class="note" style="margin-top:12px"><div>Videos are linked, not uploaded — a video file is far too big for browser storage.
         Drop the .mp4 next to <b>index.html</b> and use a plain filename like <b>loop.mp4</b>, or paste a URL.</div></div>
-      </div></div>
-
-    <div class="panel"><div class="ph"><h3>TV layout</h3><span class="hint">How the board itself is arranged — not brand, just mechanics</span></div>
+      </div></div>`;
+}
+function tabBrandLayout(st){
+  return `<div class="panel"><div class="ph"><h3>TV layout</h3><span class="hint">How the board itself is arranged — not brand, just mechanics</span></div>
       <div class="pb"><div class="fields">
         <div class="f"><label>Number of slots</label><select id="bSlots" title="How many of the 40 slots this board uses — the rest are hidden on the TV, Games tab and Lotto boxes">${Array.from({length:40},(_,k)=>k+1).map(k=>`<option value="${k}" ${slotCount(st)===k?'selected':''}>${k}</option>`).join('')}</select></div>
         <div class="f"><label>Columns on TV</label><select id="bCols"><option value="auto" ${st.view.cols==='auto'?'selected':''}>Auto — fill the screen</option>${[4,5,6,7,8,10].map(n=>`<option value="${n}" ${+st.view.cols===n?'selected':''}>${n} across</option>`).join('')}</select></div>
@@ -2324,6 +2347,7 @@ $('#cLotto').addEventListener('change',bodyChangeHandler);
 async function bodyClickHandler(e){
   const st=S(),b=e.target.closest('button');if(!b)return;const d=b.dataset,i=+(d.pick??d.link??d.wipe??d.adpick??d.adlink??d.adnoimg??d.addel??d.jpdel??d.wdel??d.acdel);
   if(d.goto){aTab=d.goto;renderAdmin();return}   // Home dashboard: jump to a tab
+  if(d.subtab){settingsSub=d.subtab;renderAdmin();return}
   if(d.ichart){insightsChart=d.ichart;renderAdmin();return}
   if(d.calnav){
     const[y,m]=(salesCalMonth||new Date().toISOString().slice(0,7)).split('-').map(Number);
