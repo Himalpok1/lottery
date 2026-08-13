@@ -162,16 +162,21 @@ button{font-family:inherit}
 .tcArt .pxy{font-family:var(--display);color:#111827;text-align:center;line-height:1.05;padding:calc(var(--cell)*.03)}
 .tcArt .pxy b{display:block;font-size:calc(var(--cell)*.075)}
 .tcArt .pxy s{text-decoration:none;display:block;font-family:var(--mono);font-size:calc(var(--cell)*.03);color:#6B7280}
-/* the slot number — what the customer says out loud */
-.slotB{position:absolute;left:0;top:0;background:var(--accent);color:#fff;
-  font-family:var(--mono);font-weight:800;font-size:calc(var(--cell)*.13);line-height:1;
-  padding:calc(var(--cell)*.035) calc(var(--cell)*.055);border-radius:0 0 calc(var(--cell)*.04) 0;
-  box-shadow:0 2px 6px rgba(0,0,0,.25);z-index:2}
-/* the ticket price — same colour as its price-tier dot in the legend up top */
-.priceB{position:absolute;right:0;top:0;background:var(--c);color:#fff;
-  font-family:var(--mono);font-weight:800;font-size:calc(var(--cell)*.13);line-height:1;
-  padding:calc(var(--cell)*.035) calc(var(--cell)*.055);border-radius:0 0 0 calc(var(--cell)*.04);
-  box-shadow:0 2px 6px rgba(0,0,0,.25);z-index:2}
+/* the slot number — what the customer says out loud. A plain white disc bottom-center
+   reads clearly against any ticket art, bright or dark, same trick the state's own
+   printed tickets use for the game number */
+.slotB{position:absolute;left:50%;bottom:calc(var(--cell)*.025);transform:translateX(-50%);
+  background:#fff;color:#14161C;font-family:var(--mono);font-weight:800;
+  font-size:calc(var(--cell)*.068);line-height:1;width:calc(var(--cell)*.165);height:calc(var(--cell)*.165);
+  border-radius:50%;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 2px 8px rgba(0,0,0,.4);z-index:2}
+/* the ticket price — a folded-corner ribbon banner, white on the price-tier colour so
+   it stays legible over any ticket art without covering as much of the picture */
+.priceB{position:absolute;left:0;top:0;width:48%;height:48%;overflow:hidden;z-index:2;pointer-events:none}
+.priceB i{position:absolute;left:-33%;top:19%;width:150%;transform:rotate(-45deg);transform-origin:center;
+  background:#fff;color:var(--c);text-align:center;font-family:var(--mono);font-weight:800;
+  font-style:normal;font-size:calc(var(--cell)*.034);letter-spacing:.02em;padding:calc(var(--cell)*.014) 0;
+  box-shadow:0 1px 6px rgba(0,0,0,.35)}
 /* the state's own CLOSING SOON corner ribbon */
 .ribbon{position:absolute;right:0;bottom:0;width:60%;height:60%;overflow:hidden;z-index:2;pointer-events:none}
 .ribbon i{position:absolute;right:-32%;bottom:18%;width:150%;transform:rotate(-45deg);transform-origin:center;
@@ -302,13 +307,17 @@ button{font-family:inherit}
   border-right:1px solid var(--bd);display:flex;flex-direction:column}
 .aBrand{padding:20px 18px 16px;border-bottom:1px solid var(--bd)}
 .aBrand h2{font-family:var(--display);font-size:18px;margin:0;color:var(--r);line-height:1.2}
+.aStoreIcon{width:38px;height:38px;border-radius:10px;background:var(--r-lt);flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;font-size:19px}
 .aStoreField{padding:14px 18px;border-bottom:1px solid var(--bd)}
 .aStoreField label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.08em;
   color:var(--ink-3);font-weight:700;margin-bottom:6px}
 .aStoreField select{width:100%}
 .vtabs{display:flex;flex-direction:column;gap:1px;flex:1 1 auto;padding:10px 10px;overflow-y:auto}
 .vtab{background:transparent;color:var(--ink-2);border:none;border-radius:8px;padding:9px 12px;
-  font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%}
+  font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%;
+  display:flex;align-items:center;gap:10px}
+.vtab svg{flex:0 0 auto;opacity:.85}
 .vtab:hover{color:var(--r);background:var(--r-lt)}
 .vtab.on{background:var(--r-lt);color:var(--r);font-weight:800}
 /* small inline period-selector pills — chart range, top-sellers range, etc. */
@@ -513,7 +522,9 @@ tr:hover td{background:var(--r-lt)}
 <!-- ============ BACKEND ============ -->
 <div id="admin" class="hidden">
   <div class="aside">
-    <div class="aBrand"><h2 id="aStoreName">Backend</h2></div>
+    <div class="aBrand" style="display:flex;align-items:center;gap:10px">
+      <div class="aStoreIcon">🏪</div><h2 id="aStoreName">Backend</h2>
+    </div>
     <div class="aStoreField"><label>Store</label><select id="aStore" class="in"></select></div>
     <nav class="vtabs" id="aTabs"></nav>
     <div class="aFoot">
@@ -779,6 +790,26 @@ function imgTag(g,cls=''){
     onerror="if(!this.dataset.t){this.dataset.t=1;this.src='${back}';}else{this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='';}">`;
 }
 const svgSync=()=>'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>';
+/* small line-icon set — one path string per name, wrapped into an <svg> by icon().
+   Hand-drawn instead of an icon font: keeps the app at zero external dependencies. */
+const ICONS={
+  home:'<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
+  games:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  tag:'<path d="M20.6 12L12 20.6 3 11.6V3h8.6L20.6 12z"/><circle cx="7.5" cy="7.5" r="1.4"/>',
+  ads:'<path d="M3 10v4h4l5 5V5L7 10H3z"/><path d="M16.5 8a4 4 0 010 8"/>',
+  sales:'<path d="M3 21h18"/><rect x="6" y="12" width="3" height="7"/><rect x="11" y="8" width="3" height="11"/><rect x="16" y="4" width="3" height="15"/>',
+  insights:'<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
+  inventory:'<path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v9"/>',
+  lotto:'<rect x="6" y="4" width="12" height="17" rx="1.5"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M9 11h6M9 15h6"/>',
+  stores:'<path d="M3 9l1-5h16l1 5"/><path d="M4 9v11h16V9"/><path d="M9 20v-6h6v6"/>',
+  data:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
+  swap:'<path d="M4 4v6h6"/><path d="M20 20v-6h-6"/><path d="M5 15a8 8 0 0013.6 3.4M19 9A8 8 0 005.4 5.6"/>',
+  calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
+  lock:'<rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 018 0v4"/>',
+};
+const icon=(name,size=18)=>`<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]||''}</svg>`;
+const TAB_ICON={home:'home',games:'games',brand:'tag',ads:'ads',sales:'sales',insights:'insights',intake:'inventory',lotto:'lotto',stores:'stores',data:'data'};
 const THEMES={
   texas:{name:'White & Red',bg:'#FFFFFF',bg2:'#F3F5F8',text:'#14171F',accent:'#D62828',light:true},
   redwhite:{name:'Red & White',bg:'#C1121F',bg2:'#8E0C17',text:'#FFFFFF',accent:'#FFFFFF'},
@@ -1016,7 +1047,7 @@ function cardTile(g,i,st,mods={}){
   return `<div class="tc ${mods.dim?'dim':''} ${mods.pick?'pick':''} ${art?'stock':''}" style="--i:${i};--c:${c}">
     <div class="tcArt">
       <div class="slotB">${String(g.slot).padStart(2,'0')}</div>
-      ${g.price!==''?`<div class="priceB">$${esc(g.price)}</div>`:''}
+      ${g.price!==''?`<div class="priceB"><i>$${esc(g.price)}</i></div>`:''}
       ${art||(g.img?`${imgTag(g)}<div class="pxy" style="display:none"><b>${g.price!==''?'$'+esc(g.price):'—'}</b><s>${g.no?'#'+esc(g.no):''}</s></div>`
              :`<div class="pxy"><b>${g.price!==''?'$'+esc(g.price):'—'}</b><s>${g.no?'#'+esc(g.no):'no picture'}</s></div>`)}
       ${art?'':(g.closing?`<div class="ribbon"><i>CLOSING SOON</i></div>`:'')}
@@ -1319,31 +1350,53 @@ function tabHome(st){
   const fl=st.games.filter(filled);
   const oos=fl.filter(g=>g.status==='oos'), soon=fl.filter(g=>g.status==='soon'), closing=fl.filter(g=>g.closing);
   const low=fl.filter(g=>g.prizesLeft!==''&&g.prizesLeft!=null&&+g.prizesLeft<=+st.view.endingAt);
-  const today=new Date().toISOString().slice(0,10), lottoToday=!!(st.lotto&&st.lotto[today]);
+  const now=new Date(),today=now.toISOString().slice(0,10), lottoToday=!!(st.lotto&&st.lotto[today]);
   const nm=a=>esc(a.slice(0,3).map(g=>g.name||('#'+g.no)).join(', ')+(a.length>3?' +'+(a.length-3):''));
   const items=[];
-  if(oos.length)items.push({c:'#D62828',t:`${oos.length} out of stock`,s:nm(oos),go:'games',b:'Review'});
-  if(closing.length)items.push({c:'#B8860B',t:`${closing.length} closing soon`,s:nm(closing),go:'games',b:'Update'});
-  if(!lottoToday)items.push({c:'#2A6FB0',t:'Lotto not logged today',s:'Keep your daily count current',go:'lotto',b:'Log now'});
-  if(soon.length)items.push({c:'#2A6FB0',t:`${soon.length} marked coming soon`,s:nm(soon),go:'games',b:'Review'});
-  if(low.length)items.push({c:'#B8860B',t:`${low.length} low on top prizes`,s:nm(low),go:'games',b:'Review'});
-  const actions=[['games','Mark out of stock'],['games','Swap / replace'],['lotto','Log lotto shift'],['data','New arrival']];
-  return `<div class="cards">
-      <div class="stat"><div class="k">Games on the board</div><div class="v">${fl.length} / 40</div></div>
-      <div class="stat" style="border-left-color:#D62828"><div class="k">Out of stock</div><div class="v" style="color:#D62828">${oos.length}</div></div>
-      <div class="stat" style="border-left-color:#2A6FB0"><div class="k">Coming soon</div><div class="v" style="color:#2A6FB0">${soon.length}</div></div>
-      <div class="stat" style="border-left-color:#B8860B"><div class="k">Closing soon</div><div class="v" style="color:#B8860B">${closing.length}</div></div>
+  if(oos.length)items.push({ic:'inventory',c:'#D62828',bg:'#FDECEC',t:`${oos.length} out of stock`,s:nm(oos),go:'games',b:'Review'});
+  if(closing.length)items.push({ic:'lock',c:'#B8860B',bg:'#FCF3DE',t:`${closing.length} closing soon`,s:nm(closing),go:'games',b:'Update'});
+  if(!lottoToday)items.push({ic:'calendar',c:'#2A6FB0',bg:'#E8F1FC',t:'Lotto not logged today',s:'Keep your daily count current',go:'lotto',b:'Log now'});
+  if(soon.length)items.push({ic:'clock',c:'#2A6FB0',bg:'#E8F1FC',t:`${soon.length} marked coming soon`,s:nm(soon),go:'games',b:'Review'});
+  if(low.length)items.push({ic:'lock',c:'#B8860B',bg:'#FCF3DE',t:`${low.length} low on top prizes`,s:nm(low),go:'games',b:'Review'});
+  const actions=[['inventory','games','Mark out of stock'],['swap','games','Swap / replace'],['lotto','lotto','Log lotto shift'],['tag','data','New arrival']];
+  const hour=now.getHours(),greeting=hour<12?'Good morning':hour<18?'Good afternoon':'Good evening';
+  const acc=currentAccount();
+  const cards=[
+    {ic:'games',c:'#D62828',bg:'#FDECEC',k:'Games on the board',v:`${fl.length} / 40`,s:'All games are active',dot:'#1D7A4C'},
+    {ic:'inventory',c:'#E8871E',bg:'#FFF3E0',k:'Out of stock',v:oos.length,s:oos.length?`${oos.length} need restocking`:'Everything in stock',dot:oos.length?'#D62828':'#1D7A4C'},
+    {ic:'clock',c:'#2A6FB0',bg:'#E8F1FC',k:'Coming soon',v:soon.length,s:soon.length?`${soon.length} pending`:'No pending games',dot:soon.length?'#2A6FB0':'#1D7A4C'},
+    {ic:'lock',c:'#1D7A4C',bg:'#E8F7EE',k:'Closing soon',v:closing.length,s:closing.length?`${closing.length} games closing soon`:'Nothing closing',dot:closing.length?'#B8860B':'#1D7A4C'},
+  ];
+  return `<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:18px">
+      <div><h2 style="margin:0 0 4px;font-family:var(--display);font-size:23px">${greeting}, ${esc(acc?acc.name:'')} 👋</h2>
+        <p style="margin:0;color:var(--ink-2);font-size:13.5px">Here's what's happening with your lottery today.</p></div>
+      <div style="display:flex;align-items:center;gap:8px;background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:9px 14px;font-size:12.5px;color:var(--ink-2)">
+        ${icon('calendar',15)}${now.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}
+        <span style="width:1px;height:14px;background:var(--bd)"></span>
+        ${icon('clock',15)}${now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}
+      </div></div>
+    <div class="cards">${cards.map(c=>`
+      <div class="stat" style="border-left-color:${c.c};display:flex;gap:12px;align-items:flex-start">
+        <div style="width:44px;height:44px;border-radius:12px;background:${c.bg};color:${c.c};flex:0 0 auto;display:flex;align-items:center;justify-content:center">${icon(c.ic,21)}</div>
+        <div style="min-width:0">
+          <div class="k">${c.k}</div><div class="v" style="color:${c.c}">${c.v}</div>
+          <div style="display:flex;align-items:center;gap:5px;margin-top:3px;font-size:11.5px;color:var(--ink-3)">
+            <span style="width:6px;height:6px;border-radius:50%;background:${c.dot};flex:0 0 auto"></span>${esc(c.s)}</div>
+        </div></div>`).join('')}
     </div>
     <div class="panel"><div class="ph"><h3>Quick actions</h3><span class="hint">The things you do most, one tap away</span></div>
       <div class="pb"><div style="display:flex;gap:10px;flex-wrap:wrap">
-        ${actions.map(([go,l])=>`<button class="btn" data-goto="${go}" style="flex:1;min-width:130px;padding:15px 10px;font-weight:700">${l}</button>`).join('')}
+        ${actions.map(([ic,go,l])=>`<button class="btn" data-goto="${go}" style="flex:1;min-width:140px;padding:14px 12px;font-weight:700;
+            display:flex;flex-direction:column;align-items:flex-start;gap:10px">
+          <span style="width:38px;height:38px;border-radius:10px;background:var(--r-lt);color:var(--r);display:flex;align-items:center;justify-content:center">${icon(ic,19)}</span>
+          <span>${l}</span></button>`).join('')}
       </div></div></div>
     <div class="panel"><div class="ph"><h3>Needs your attention</h3><span class="hint">${items.length?items.length+' to handle':'all caught up'}</span></div>
       <div class="pb">${items.length?items.map(it=>`
-        <div style="display:flex;align-items:center;gap:12px;background:var(--sf);border:1px solid var(--bd);border-radius:11px;padding:12px 14px;margin-bottom:8px">
-          <span style="width:11px;height:11px;border-radius:50%;background:${it.c};flex:0 0 auto"></span>
+        <div style="display:flex;align-items:center;gap:14px;background:${it.bg};border-radius:11px;padding:12px 14px;margin-bottom:8px">
+          <span style="width:38px;height:38px;border-radius:10px;background:#fff;color:${it.c};flex:0 0 auto;display:flex;align-items:center;justify-content:center">${icon(it.ic,19)}</span>
           <div style="flex:1;min-width:0"><div style="font-weight:700">${it.t}</div><div class="hint" style="margin:0">${it.s}</div></div>
-          <button class="btn sm" data-goto="${it.go}">${it.b}</button>
+          <button class="btn sm" data-goto="${it.go}" style="background:#fff">${it.b}</button>
         </div>`).join(''):'<div class="note"><div>Nothing needs attention right now — the board is in good shape.</div></div>'}
       </div></div>`;
 }
@@ -1357,7 +1410,7 @@ function renderAdmin(){
   $('#aAvatar').textContent=acc?(acc.name||'?').trim().charAt(0).toUpperCase():'';
   const myStores=acc.role==='owner'?db.stores:db.stores.filter(s=>accountStoreIds(acc).includes(s.id));
   $('#aStore').innerHTML=myStores.map(s=>`<option value="${s.id}" ${s.id===db.active?'selected':''}>${esc(s.name)}</option>`).join('');
-  $('#aTabs').innerHTML=tabs.map(([k,l])=>`<button class="vtab ${aTab===k?'on':''}" data-tab="${k}">${l}</button>`).join('');
+  $('#aTabs').innerHTML=tabs.map(([k,l])=>`<button class="vtab ${aTab===k?'on':''}" data-tab="${k}">${icon(TAB_ICON[k]||'tag',17)}<span>${l}</span></button>`).join('');
   $('#aBody').innerHTML=({home:tabHome,games:tabGames,brand:tabBrand,ads:tabAds,jackpots:tabJp,winners:tabWin,
     sales:tabSales,insights:tabInsights,intake:tabIntake,lotto:tabLotto,stores:tabStores,data:tabData}[aTab]||tabGames)(st);
 }
@@ -1562,19 +1615,54 @@ function tabWin(st){
         '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:26px">No winners posted yet.</td></tr>'}
       </tbody></table></div></div>`;
 }
+let salesCalMonth=null;
 function tabSales(st){
   const days=Object.keys(st.sales).sort().reverse();
   const sum=obj=>Object.entries(obj||{}).reduce((a,[p,n])=>({t:a.t+n,r:a.r+n*+p}),{t:0,r:0});
-  const today=sum(st.sales[new Date().toISOString().slice(0,10)]);
-  const month=new Date().toISOString().slice(0,7);
+  const todayStr=new Date().toISOString().slice(0,10);
+  const today=sum(st.sales[todayStr]);
+  const month=todayStr.slice(0,7);
   const mo=days.filter(d=>d.startsWith(month)).reduce((a,d)=>{const s=sum(st.sales[d]);return{t:a.t+s.t,r:a.r+s.r}},{t:0,r:0});
   const yr=days.filter(d=>d.startsWith(month.slice(0,4))).reduce((a,d)=>{const s=sum(st.sales[d]);return{t:a.t+s.t,r:a.r+s.r}},{t:0,r:0});
+
+  // month-view calendar — each day's revenue at a glance, like a store ledger page
+  if(!salesCalMonth)salesCalMonth=month;
+  const[cy,cm]=salesCalMonth.split('-').map(Number);
+  const nDays=daysInMonth(cy,cm);
+  const firstDow=new Date(cy,cm-1,1).getDay();
+  const monthLabel=new Date(cy,cm-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  const dayRevenue=d=>sum(st.sales[d]).r;
+  const cells=Array(firstDow).fill(null).concat(Array.from({length:nDays},(_,i)=>i+1));
+  while(cells.length%7)cells.push(null);
+  const mtd=Array.from({length:nDays},(_,i)=>dayRevenue(`${salesCalMonth}-${String(i+1).padStart(2,'0')}`)).reduce((a,r)=>a+r,0);
+
   return `<div class="cards">
       <div class="stat"><div class="k">Sold today</div><div class="v">${today.t}</div></div>
       <div class="stat"><div class="k">Today's revenue</div><div class="v" style="color:#157F3B">$${today.r}</div></div>
       <div class="stat"><div class="k">This month</div><div class="v">${mo.t} · $${mo.r}</div></div>
       <div class="stat"><div class="k">This year</div><div class="v">${yr.t} · $${yr.r}</div></div>
     </div>
+    <div class="panel"><div class="ph"><h3>Sales calendar</h3><span class="hint">Revenue per day — browse any month</span>
+      <div class="sp"></div>
+      <button class="btn sm" data-calnav="prev">‹ Prev</button>
+      <span style="font-weight:800;padding:0 6px;min-width:150px;text-align:center;display:inline-block">${monthLabel}</span>
+      <button class="btn sm" data-calnav="next">Next ›</button></div>
+      <div class="pb">
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--bd);border:1px solid var(--bd);border-radius:10px;overflow:hidden">
+          ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div style="background:var(--sf-2);padding:8px 4px;text-align:center;font-size:10.5px;font-weight:800;color:var(--ink-3);text-transform:uppercase">${d}</div>`).join('')}
+          ${cells.map(d=>{
+            if(d==null)return `<div style="background:var(--sf-2);min-height:64px"></div>`;
+            const ds=`${salesCalMonth}-${String(d).padStart(2,'0')}`,r=dayRevenue(ds),isToday=ds===todayStr;
+            return `<div style="background:#fff;min-height:64px;padding:7px;${isToday?'box-shadow:inset 0 0 0 2px var(--r);border-radius:2px':''}">
+              <div style="font-size:11.5px;font-weight:700;color:var(--ink-3)">${d}</div>
+              ${r?`<div style="margin-top:4px;font-size:12.5px;font-weight:800;color:#157F3B">$${r.toLocaleString()}</div>`:''}
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="text-align:center;margin-top:14px;padding:11px;background:var(--r-lt);border-radius:10px;font-weight:800;color:var(--r);font-size:14px">
+          Sales MTD $${mtd.toLocaleString()}
+        </div>
+      </div></div>
     <div class="panel"><div class="ph"><h3>Daily sales</h3><span class="hint">Tickets logged from the counter app</span>
       <div class="sp"></div><button class="btn sm" id="salesCsv">Export CSV</button></div>
       <div style="overflow-x:auto"><table>
@@ -2173,6 +2261,12 @@ async function bodyClickHandler(e){
   const st=S(),b=e.target.closest('button');if(!b)return;const d=b.dataset,i=+(d.pick??d.link??d.wipe??d.adpick??d.adlink??d.adnoimg??d.addel??d.jpdel??d.wdel??d.acdel);
   if(d.goto){aTab=d.goto;renderAdmin();return}   // Home dashboard: jump to a tab
   if(d.ichart){insightsChart=d.ichart;renderAdmin();return}
+  if(d.calnav){
+    const[y,m]=(salesCalMonth||new Date().toISOString().slice(0,7)).split('-').map(Number);
+    const dt=new Date(y,m-1+(d.calnav==='next'?1:-1),1);
+    salesCalMonth=monthKeyOf(dt.getFullYear(),dt.getMonth()+1);
+    renderAdmin();return;
+  }
   if(d.irange){insightsRange=d.irange;renderAdmin();return}
   if(b.id==='intakeAdd'){
     const no=$('#intakeGame').value,qty=+$('#intakeQty').value,date=$('#intakeDate').value;
