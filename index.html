@@ -164,18 +164,22 @@ button{font-family:inherit}
 .tcArt .pxy s{text-decoration:none;display:block;font-family:var(--mono);font-size:calc(var(--cell)*.03);color:#6B7280}
 /* the slot number — what the customer says out loud. A plain white disc bottom-center
    reads clearly against any ticket art, bright or dark, same trick the state's own
-   printed tickets use for the game number */
+   printed tickets use for the game number. Position is configurable (left/middle/right)
+   under Branding > Ticket properties; "middle" (the default) is this centered rule. */
 .slotB{position:absolute;left:50%;bottom:calc(var(--cell)*.025);transform:translateX(-50%);
   background:#fff;color:#14161C;font-family:var(--mono);font-weight:800;
   font-size:calc(var(--cell)*.068);line-height:1;width:calc(var(--cell)*.165);height:calc(var(--cell)*.165);
   border-radius:50%;display:flex;align-items:center;justify-content:center;
   box-shadow:0 2px 8px rgba(0,0,0,.4);z-index:2}
-/* the ticket price — a folded-corner ribbon banner, white on the price-tier colour so
-   it stays legible over any ticket art without covering as much of the picture */
-.priceB{position:absolute;left:0;top:0;width:48%;height:48%;overflow:hidden;z-index:2;pointer-events:none}
-.priceB i{position:absolute;left:-33%;top:19%;width:150%;transform:rotate(-45deg);transform-origin:center;
-  background:#fff;color:var(--c);text-align:center;font-family:var(--mono);font-weight:800;
-  font-style:normal;font-size:calc(var(--cell)*.034);letter-spacing:.02em;padding:calc(var(--cell)*.014) 0;
+.slotB.left{left:calc(var(--cell)*.03);transform:none}
+.slotB.right{left:auto;right:calc(var(--cell)*.03);transform:none}
+/* the ticket price — a folded-corner ribbon banner. Solid black on white, sized to
+   match the slot badge, so it reads instantly from across the room — tier colour was
+   too soft to read at a glance, this is the same call as the state's own price tags */
+.priceB{position:absolute;left:0;top:0;width:64%;height:64%;overflow:hidden;z-index:2;pointer-events:none}
+.priceB i{position:absolute;left:-33%;top:23%;width:150%;transform:rotate(-45deg);transform-origin:center;
+  background:#fff;color:#14161C;text-align:center;font-family:var(--mono);font-weight:800;
+  font-style:normal;font-size:calc(var(--cell)*.075);letter-spacing:.01em;padding:calc(var(--cell)*.024) 0;
   box-shadow:0 1px 6px rgba(0,0,0,.35)}
 /* the state's own CLOSING SOON corner ribbon */
 .ribbon{position:absolute;right:0;bottom:0;width:60%;height:60%;overflow:hidden;z-index:2;pointer-events:none}
@@ -1039,15 +1043,16 @@ const stockArt=g=>{const s=STOCK[g.status];if(!s)return'';
   return `<div class="stockArt ${g.status}">${s.ico}<div class="lbl">${s.lbl}</div>${g.name?`<div class="sub">${esc(g.name)}</div>`:''}</div>`;};
 function cardTile(g,i,st,mods={}){
   const c=tierColor(g.price),art=stockArt(g);
+  const showSlot=st.view.showSlot!==false,showPrice=st.view.showPrice!==false;
+  const slotPos=st.view.slotPos&&st.view.slotPos!=='middle'?' '+st.view.slotPos:'';
+  const slotHtml=showSlot?`<div class="slotB${slotPos}">${String(g.slot).padStart(2,'0')}</div>`:'';
   if(!filled(g))return art
-    ? `<div class="tc stock" style="--i:${i}"><div class="tcArt">
-      <div class="slotB">${String(g.slot).padStart(2,'0')}</div>${art}</div></div>`
-    : `<div class="tc empty" style="--i:${i}"><div class="tcArt">
-      <div class="slotB">${String(g.slot).padStart(2,'0')}</div><div class="noart">open slot</div></div></div>`;
+    ? `<div class="tc stock" style="--i:${i}"><div class="tcArt">${slotHtml}${art}</div></div>`
+    : `<div class="tc empty" style="--i:${i}"><div class="tcArt">${slotHtml}<div class="noart">open slot</div></div></div>`;
   return `<div class="tc ${mods.dim?'dim':''} ${mods.pick?'pick':''} ${art?'stock':''}" style="--i:${i};--c:${c}">
     <div class="tcArt">
-      <div class="slotB">${String(g.slot).padStart(2,'0')}</div>
-      ${g.price!==''?`<div class="priceB"><i>$${esc(g.price)}</i></div>`:''}
+      ${slotHtml}
+      ${showPrice&&g.price!==''?`<div class="priceB"><i>$${esc(g.price)}</i></div>`:''}
       ${art||(g.img?`${imgTag(g)}<div class="pxy" style="display:none"><b>${g.price!==''?'$'+esc(g.price):'—'}</b><s>${g.no?'#'+esc(g.no):''}</s></div>`
              :`<div class="pxy"><b>${g.price!==''?'$'+esc(g.price):'—'}</b><s>${g.no?'#'+esc(g.no):'no picture'}</s></div>`)}
       ${art?'':(g.closing?`<div class="ribbon"><i>CLOSING SOON</i></div>`:'')}
@@ -1553,6 +1558,16 @@ function tabBrand(st){
         <div class="f"><label>Tile style</label><select id="bTile">
           <option value="card" ${(st.view.tile||'card')==='card'?'selected':''}>Ticket cards</option>
           <option value="rack" ${st.view.tile==='rack'?'selected':''}>Rack slots</option></select></div>
+      </div></div></div>
+
+    <div class="panel"><div class="ph"><h3>Ticket properties</h3><span class="hint">The badges printed over each ticket's art (Ticket cards style only)</span></div>
+      <div class="pb"><div class="fields">
+        <div class="f"><label class="chk" style="margin:0"><input type="checkbox" id="bShowSlot" ${st.view.showSlot!==false?'checked':''}> Show slot #</label></div>
+        <div class="f"><label>Slot # position</label><select id="bSlotPos" ${st.view.showSlot===false?'disabled':''}>
+          <option value="left" ${st.view.slotPos==='left'?'selected':''}>Left</option>
+          <option value="middle" ${(!st.view.slotPos||st.view.slotPos==='middle')?'selected':''}>Middle</option>
+          <option value="right" ${st.view.slotPos==='right'?'selected':''}>Right</option></select></div>
+        <div class="f"><label class="chk" style="margin:0"><input type="checkbox" id="bShowPrice" ${st.view.showPrice!==false?'checked':''}> Show ticket price</label></div>
       </div></div></div>`;
 }
 function tabAds(st){
@@ -1617,32 +1632,39 @@ function tabWin(st){
 }
 let salesCalMonth=null;
 function tabSales(st){
+  // top cards + calendar are the real dollar figure from Lotto Reporting's shift
+  // reconciliation ((Open-Close)+Add+Online), not the counter app's manual ticket taps —
+  // the meter math is a hard reconciliation, taps are easy to miss
+  st.lotto=st.lotto||{};
+  const lottoDays=Object.keys(st.lotto).sort().reverse();
+  const soldOn=d=>{const day=st.lotto[d];return day?daySold(day):0};
+  const todayStr=new Date().toISOString().slice(0,10);
+  const todaySold=soldOn(todayStr);
+  const month=todayStr.slice(0,7);
+  const moSold=lottoDays.filter(d=>d.startsWith(month)).reduce((a,d)=>a+soldOn(d),0);
+  const yrSold=lottoDays.filter(d=>d.startsWith(month.slice(0,4))).reduce((a,d)=>a+soldOn(d),0);
+
+  // scratch-off ticket taps, still shown below in their own per-price table
   const days=Object.keys(st.sales).sort().reverse();
   const sum=obj=>Object.entries(obj||{}).reduce((a,[p,n])=>({t:a.t+n,r:a.r+n*+p}),{t:0,r:0});
-  const todayStr=new Date().toISOString().slice(0,10);
-  const today=sum(st.sales[todayStr]);
-  const month=todayStr.slice(0,7);
-  const mo=days.filter(d=>d.startsWith(month)).reduce((a,d)=>{const s=sum(st.sales[d]);return{t:a.t+s.t,r:a.r+s.r}},{t:0,r:0});
-  const yr=days.filter(d=>d.startsWith(month.slice(0,4))).reduce((a,d)=>{const s=sum(st.sales[d]);return{t:a.t+s.t,r:a.r+s.r}},{t:0,r:0});
 
-  // month-view calendar — each day's revenue at a glance, like a store ledger page
+  // month-view calendar — each day's lotto revenue at a glance, like a store ledger page
   if(!salesCalMonth)salesCalMonth=month;
   const[cy,cm]=salesCalMonth.split('-').map(Number);
   const nDays=daysInMonth(cy,cm);
   const firstDow=new Date(cy,cm-1,1).getDay();
   const monthLabel=new Date(cy,cm-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});
-  const dayRevenue=d=>sum(st.sales[d]).r;
   const cells=Array(firstDow).fill(null).concat(Array.from({length:nDays},(_,i)=>i+1));
   while(cells.length%7)cells.push(null);
-  const mtd=Array.from({length:nDays},(_,i)=>dayRevenue(`${salesCalMonth}-${String(i+1).padStart(2,'0')}`)).reduce((a,r)=>a+r,0);
+  const mtd=Array.from({length:nDays},(_,i)=>soldOn(`${salesCalMonth}-${String(i+1).padStart(2,'0')}`)).reduce((a,r)=>a+r,0);
 
   return `<div class="cards">
-      <div class="stat"><div class="k">Sold today</div><div class="v">${today.t}</div></div>
-      <div class="stat"><div class="k">Today's revenue</div><div class="v" style="color:#157F3B">$${today.r}</div></div>
-      <div class="stat"><div class="k">This month</div><div class="v">${mo.t} · $${mo.r}</div></div>
-      <div class="stat"><div class="k">This year</div><div class="v">${yr.t} · $${yr.r}</div></div>
+      <div class="stat"><div class="k">Lotto sold today</div><div class="v" style="color:#157F3B">$${todaySold.toLocaleString()}</div></div>
+      <div class="stat"><div class="k">This month</div><div class="v" style="color:#157F3B">$${moSold.toLocaleString()}</div></div>
+      <div class="stat"><div class="k">This year</div><div class="v" style="color:#157F3B">$${yrSold.toLocaleString()}</div></div>
+      <div class="stat"><div class="k">Scratch-off tickets today</div><div class="v">${sum(st.sales[todayStr]).t}</div></div>
     </div>
-    <div class="panel"><div class="ph"><h3>Sales calendar</h3><span class="hint">Revenue per day — browse any month</span>
+    <div class="panel"><div class="ph"><h3>Sales calendar</h3><span class="hint">Lotto revenue per day, from Lotto Reporting — browse any month</span>
       <div class="sp"></div>
       <button class="btn sm" data-calnav="prev">‹ Prev</button>
       <span style="font-weight:800;padding:0 6px;min-width:150px;text-align:center;display:inline-block">${monthLabel}</span>
@@ -1652,7 +1674,7 @@ function tabSales(st){
           ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div style="background:var(--sf-2);padding:8px 4px;text-align:center;font-size:10.5px;font-weight:800;color:var(--ink-3);text-transform:uppercase">${d}</div>`).join('')}
           ${cells.map(d=>{
             if(d==null)return `<div style="background:var(--sf-2);min-height:64px"></div>`;
-            const ds=`${salesCalMonth}-${String(d).padStart(2,'0')}`,r=dayRevenue(ds),isToday=ds===todayStr;
+            const ds=`${salesCalMonth}-${String(d).padStart(2,'0')}`,r=soldOn(ds),isToday=ds===todayStr;
             return `<div style="background:#fff;min-height:64px;padding:7px;${isToday?'box-shadow:inset 0 0 0 2px var(--r);border-radius:2px':''}">
               <div style="font-size:11.5px;font-weight:700;color:var(--ink-3)">${d}</div>
               ${r?`<div style="margin-top:4px;font-size:12.5px;font-weight:800;color:#157F3B">$${r.toLocaleString()}</div>`:''}
@@ -1663,7 +1685,7 @@ function tabSales(st){
           Sales MTD $${mtd.toLocaleString()}
         </div>
       </div></div>
-    <div class="panel"><div class="ph"><h3>Daily sales</h3><span class="hint">Tickets logged from the counter app</span>
+    <div class="panel"><div class="ph"><h3>Scratch-off tickets by price</h3><span class="hint">Tickets logged from the counter app — separate from the lotto figures above</span>
       <div class="sp"></div><button class="btn sm" id="salesCsv">Export CSV</button></div>
       <div style="overflow-x:auto"><table>
         <thead><tr><th style="width:130px">Date</th>${PRICES.map(p=>`<th class="rno">$${p}</th>`).join('')}<th>Tickets</th><th>Revenue</th></tr></thead>
@@ -2204,6 +2226,9 @@ function bodyChangeHandler(e){
   if(el.id==='bEmpty'){st.view.empty=el.value;save()}
   if(el.id==='bSort'){st.view.sort=el.value;save()}
   if(el.id==='bTile'){st.view.tile=el.value;save();reRender()}
+  if(el.id==='bShowSlot'){st.view.showSlot=el.checked;save();reRender()}
+  if(el.id==='bSlotPos'){st.view.slotPos=el.value;save();reRender()}
+  if(el.id==='bShowPrice'){st.view.showPrice=el.checked;save();reRender()}
   if(el.id==='bBgType'){st.brand.bgType=el.value;save();reRender()}
   if(el.id==='bAcc'){st.brand.accent=el.value;save();reRender()}
   if(el.id==='bAppAcc'){st.brand.appAccent=el.value;save();reRender()}
