@@ -380,6 +380,12 @@ tr:hover td{background:var(--r-lt)}
 .swatch{display:flex;gap:7px;flex-wrap:wrap}
 .sw{width:34px;height:34px;border-radius:8px;border:2px solid var(--bd);cursor:pointer}
 .sw.on{border-color:var(--ink);box-shadow:0 0 0 2px #fff inset}
+.brandPreview{flex:0 0 auto;width:280px;height:74px;border-radius:12px;padding:0 16px;
+  display:flex;align-items:center;gap:10px;overflow:hidden;box-shadow:0 1px 2px rgba(20,23,31,.15)}
+.brandPreview img{height:34px;max-width:60px;object-fit:contain;flex:0 0 auto}
+.brandPreview div{display:flex;flex-direction:column;gap:2px;overflow:hidden}
+.brandPreview b{font-family:var(--display);font-size:16px;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brandPreview span{font-family:var(--mono);font-weight:700;font-size:10px;letter-spacing:.14em;text-transform:uppercase}
 .themes{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .th{border:1.5px solid var(--bd-2);border-radius:11px;padding:11px;cursor:pointer;text-align:left;background:#fff}
 .th:hover{border-color:var(--r)}
@@ -1385,36 +1391,32 @@ function tabGames(st){
   </div>`;
 }
 function tabBrand(st){
-  const b=st.brand;
-  return `<div class="panel"><div class="ph"><h3>Branded display</h3><span class="hint">Your name, your logo, your colors</span></div>
-    <div class="pb"><div class="fields">
-      <div class="f" style="flex:1;min-width:220px"><label>Display title</label><input id="bT" value="${esc(b.title)}"></div>
-      <div class="f" style="min-width:160px"><label>Subtitle</label><input id="bS" value="${esc(b.sub)}"></div>
-      <div class="f"><label>Logo</label><div style="display:flex;gap:7px;align-items:center">
-        <div class="thumb ${b.logo?'':'none'}" style="width:56px;height:40px">${b.logo?`<img src="${esc(imgSrc(b.logo))}">`:'none'}</div>
-        <button class="btn sm" id="bLogoPick">Upload</button>
-        <button class="btn sm" id="bLogoLink">Link</button>
-        ${b.logo?'<button class="btn sm danger" id="bLogoDel">×</button>':''}</div></div>
-      <div class="f"><label>Number of slots</label><select id="bSlots" title="How many of the 40 slots this board uses — the rest are hidden on the TV, Games tab and Lotto boxes">${Array.from({length:40},(_,k)=>k+1).map(k=>`<option value="${k}" ${slotCount(st)===k?'selected':''}>${k}</option>`).join('')}</select></div>
-      <div class="f"><label>Columns on TV</label><select id="bCols"><option value="auto" ${st.view.cols==='auto'?'selected':''}>Auto — fill the screen</option>${[4,5,6,7,8,10].map(n=>`<option value="${n}" ${+st.view.cols===n?'selected':''}>${n} across</option>`).join('')}</select></div>
-      <div class="f"><label>Empty slots</label><select id="bEmpty">
-        <option value="show" ${st.view.empty==='show'?'selected':''}>Show as blanks</option>
-        <option value="hide" ${st.view.empty==='hide'?'selected':''}>Hide</option></select></div>
-      <div class="f"><label>Order by</label><select id="bSort">
-        <option value="slot" ${st.view.sort==='slot'?'selected':''}>Slot</option>
-        <option value="num" ${st.view.sort==='num'?'selected':''}>Game number</option>
-        <option value="price" ${st.view.sort==='price'?'selected':''}>Price</option></select></div>
-      <div class="f"><label>"Ending" when prizes left ≤</label><input id="bEnd" class="mono" type="number" min="0" value="${+st.view.endingAt}" style="width:80px"></div>
-      <div class="f"><label>Tile style</label><select id="bTile">
-        <option value="card" ${(st.view.tile||'card')==='card'?'selected':''}>Ticket cards</option>
-        <option value="rack" ${st.view.tile==='rack'?'selected':''}>Rack slots</option></select></div>
-    </div></div></div>
+  const b=st.brand,t=THEMES[b.theme]||THEMES.texas;
+  return `<div class="panel"><div class="ph"><h3>Store identity</h3><span class="hint">What the TV shows in its top bar</span></div>
+    <div class="pb">
+      <div style="display:flex;gap:16px;align-items:center;margin-bottom:16px">
+        <div class="brandPreview" style="background:${t.bg}">
+          ${b.logo?`<img src="${esc(imgSrc(b.logo))}" alt="">`:''}
+          <div><b style="color:${t.text}">${esc(b.title)||'Store name'}</b><span style="color:${b.accent||t.accent}">${esc(b.sub)||'Subtitle'}</span></div>
+        </div>
+        <div class="hint" style="max-width:260px">This is roughly how the top bar reads on the TV — the real thing also picks up whichever theme and accent you set below.</div>
+      </div>
+      <div class="fields">
+        <div class="f" style="flex:1;min-width:220px"><label>Display title</label><input id="bT" value="${esc(b.title)}" placeholder="Your store's name"></div>
+        <div class="f" style="min-width:160px"><label>Subtitle</label><input id="bS" value="${esc(b.sub)}" placeholder="Scratch-Offs"></div>
+        <div class="f"><label>Logo</label><div style="display:flex;gap:7px;align-items:center">
+          <div class="thumb ${b.logo?'':'none'}" style="width:56px;height:40px">${b.logo?`<img src="${esc(imgSrc(b.logo))}">`:'none'}</div>
+          <button class="btn sm" id="bLogoPick">Upload</button>
+          <button class="btn sm" id="bLogoLink">Link</button>
+          ${b.logo?'<button class="btn sm danger" id="bLogoDel">×</button>':''}</div></div>
+      </div>
+    </div></div>
 
-    <div class="panel"><div class="ph"><h3>Theme</h3><span class="hint">Pick a look, then fine-tune the accent</span></div>
-      <div class="pb"><div class="themes">${Object.entries(THEMES).map(([k,t])=>`
+    <div class="panel"><div class="ph"><h3>Theme &amp; colors</h3><span class="hint">Pick a look, then fine-tune the accent</span></div>
+      <div class="pb"><div class="themes">${Object.entries(THEMES).map(([k,tm])=>`
         <button class="th ${b.theme===k?'on':''}" data-theme="${k}">
-          <div class="bars"><i style="background:${t.bg}"></i><i style="background:${t.bg2}"></i><i style="background:${t.accent}"></i></div>
-          <b>${t.name}</b></button>`).join('')}</div>
+          <div class="bars"><i style="background:${tm.bg}"></i><i style="background:${tm.bg2}"></i><i style="background:${tm.accent}"></i></div>
+          <b>${tm.name}</b></button>`).join('')}</div>
         <div style="margin-top:14px"><div class="f"><label>Accent color</label>
           <div class="swatch">${ACCENTS.map(c=>`<button class="sw ${b.accent===c?'on':''}" data-accent="${c}" style="background:${c}"></button>`).join('')}
             <input type="color" id="bAcc" value="${b.accent}" style="width:34px;height:34px;padding:1px;border:1.5px solid var(--bd-2);border-radius:8px;background:#fff">
@@ -1437,7 +1439,24 @@ function tabBrand(st){
       </div>
       <div class="note" style="margin-top:12px"><div>Videos are linked, not uploaded — a video file is far too big for browser storage.
         Drop the .mp4 next to <b>index.html</b> and use a plain filename like <b>loop.mp4</b>, or paste a URL.</div></div>
-      </div></div>`;
+      </div></div>
+
+    <div class="panel"><div class="ph"><h3>TV layout</h3><span class="hint">How the board itself is arranged — not brand, just mechanics</span></div>
+      <div class="pb"><div class="fields">
+        <div class="f"><label>Number of slots</label><select id="bSlots" title="How many of the 40 slots this board uses — the rest are hidden on the TV, Games tab and Lotto boxes">${Array.from({length:40},(_,k)=>k+1).map(k=>`<option value="${k}" ${slotCount(st)===k?'selected':''}>${k}</option>`).join('')}</select></div>
+        <div class="f"><label>Columns on TV</label><select id="bCols"><option value="auto" ${st.view.cols==='auto'?'selected':''}>Auto — fill the screen</option>${[4,5,6,7,8,10].map(n=>`<option value="${n}" ${+st.view.cols===n?'selected':''}>${n} across</option>`).join('')}</select></div>
+        <div class="f"><label>Empty slots</label><select id="bEmpty">
+          <option value="show" ${st.view.empty==='show'?'selected':''}>Show as blanks</option>
+          <option value="hide" ${st.view.empty==='hide'?'selected':''}>Hide</option></select></div>
+        <div class="f"><label>Order by</label><select id="bSort">
+          <option value="slot" ${st.view.sort==='slot'?'selected':''}>Slot</option>
+          <option value="num" ${st.view.sort==='num'?'selected':''}>Game number</option>
+          <option value="price" ${st.view.sort==='price'?'selected':''}>Price</option></select></div>
+        <div class="f"><label>"Ending" when prizes left ≤</label><input id="bEnd" class="mono" type="number" min="0" value="${+st.view.endingAt}" style="width:80px"></div>
+        <div class="f"><label>Tile style</label><select id="bTile">
+          <option value="card" ${(st.view.tile||'card')==='card'?'selected':''}>Ticket cards</option>
+          <option value="rack" ${st.view.tile==='rack'?'selected':''}>Rack slots</option></select></div>
+      </div></div></div>`;
 }
 function tabAds(st){
   return `<div class="panel"><div class="ph"><h3>Store advertisements</h3>
