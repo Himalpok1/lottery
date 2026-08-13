@@ -838,9 +838,10 @@ const ICONS={
   calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
   clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
   lock:'<rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 018 0v4"/>',
+  settings:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1 1.55V21a2 2 0 01-4 0v-.09a1.7 1.7 0 00-1-1.55 1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.7 1.7 0 00.34-1.87 1.7 1.7 0 00-1.55-1H3a2 2 0 010-4h.09a1.7 1.7 0 001.55-1 1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06a1.7 1.7 0 001.87.34H9a1.7 1.7 0 001-1.55V3a2 2 0 014 0v.09a1.7 1.7 0 001 1.55 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06a1.7 1.7 0 00-.34 1.87V9a1.7 1.7 0 001.55 1H21a2 2 0 010 4h-.09a1.7 1.7 0 00-1.55 1z"/>',
 };
 const icon=(name,size=18)=>`<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]||''}</svg>`;
-const TAB_ICON={home:'home',games:'games',brand:'tag',ads:'ads',sales:'sales',insights:'insights',intake:'inventory',lotto:'lotto',stores:'stores',data:'data'};
+const TAB_ICON={home:'home',games:'games',settings:'settings',ads:'ads',sales:'sales',intake:'inventory',lotto:'lotto',data:'data'};
 const THEMES={
   texas:{name:'White & Red',bg:'#FFFFFF',bg2:'#F3F5F8',text:'#14171F',accent:'#D62828',light:true},
   redwhite:{name:'Red & White',bg:'#C1121F',bg2:'#8E0C17',text:'#FFFFFF',accent:'#FFFFFF'},
@@ -1370,12 +1371,15 @@ function logSale(price){
 
 /* ---------------- BACKEND ---------------- */
 let aTab='home';
-const TABS=[['home','Home'],['games','Games'],['brand','Branding'],['ads','Advertisements'],
-  ['sales','Sales'],['insights','Sales Insights'],['intake','Inventory'],
-  ['lotto','Lotto Reporting'],['stores','Stores & accounts'],['data','Lottery data']];
-/* Stores & accounts (adding/removing stores, managing who can log in) is Owner-only —
-   a manager can run their store day to day but can't touch the store list or accounts */
-const visibleTabs=acc=>acc&&acc.role==='owner'?TABS:TABS.filter(([k])=>k!=='stores');
+const TABS=[['home','Home'],['games','Games'],['ads','Advertisements'],
+  ['sales','Sales'],['intake','Inventory'],
+  ['lotto','Lotto Reporting'],['settings','Settings'],['data','Lottery data']];
+const visibleTabs=acc=>TABS;
+/* Sales = the day's $ totals + the Sales Insights trends, one below the other.
+   Settings = Branding + Stores & accounts, one below the other — the store list and
+   accounts are Owner-only, so a manager sees Branding but not that section. */
+function tabSalesAndInsights(st){return tabSales(st)+tabInsights(st)}
+function tabSettings(st){const acc=currentAccount();return tabBrand(st)+(acc&&acc.role==='owner'?tabStores(st):'')}
 
 /* Home dashboard: the board at a glance, the actions you do most, and a live list of
    what needs handling today — each item jumps straight to the right tab */
@@ -1444,8 +1448,8 @@ function renderAdmin(){
   const myStores=acc.role==='owner'?db.stores:db.stores.filter(s=>accountStoreIds(acc).includes(s.id));
   $('#aStore').innerHTML=myStores.map(s=>`<option value="${s.id}" ${s.id===db.active?'selected':''}>${esc(s.name)}</option>`).join('');
   $('#aTabs').innerHTML=tabs.map(([k,l])=>`<button class="vtab ${aTab===k?'on':''}" data-tab="${k}">${icon(TAB_ICON[k]||'tag',17)}<span>${l}</span></button>`).join('');
-  $('#aBody').innerHTML=({home:tabHome,games:tabGames,brand:tabBrand,ads:tabAds,jackpots:tabJp,winners:tabWin,
-    sales:tabSales,insights:tabInsights,intake:tabIntake,lotto:tabLotto,stores:tabStores,data:tabData}[aTab]||tabGames)(st);
+  $('#aBody').innerHTML=({home:tabHome,games:tabGames,settings:tabSettings,ads:tabAds,jackpots:tabJp,winners:tabWin,
+    sales:tabSalesAndInsights,intake:tabIntake,lotto:tabLotto,data:tabData}[aTab]||tabGames)(st);
 }
 function tabGames(st){
   const n=slotCount(st);
