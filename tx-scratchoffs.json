@@ -299,19 +299,6 @@
   "prizesLeft": 0
  },
  {
-  "no": "2723",
-  "name": "Lucky 7s Tripler",
-  "price": 5,
-  "start": "03/16/2026",
-  "img": "https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2723_200X200.gif",
-  "details": null,
-  "featured": false,
-  "new": false,
-  "closing": true,
-  "endDate": "08/07/2026",
-  "prizesLeft": 0
- },
- {
   "no": "2727",
   "name": "All About the 8s",
   "price": 5,
@@ -422,7 +409,7 @@
   "start": "08/17/2026",
   "img": "https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2754_200X200.gif",
   "details": null,
-  "featured": false,
+  "featured": true,
   "new": true,
   "closing": false,
   "endDate": null,
@@ -435,7 +422,7 @@
   "start": "08/17/2026",
   "img": "https://www.texaslottery.com/export/sites/lottery/Images/scratchoffs/2755_200X200.gif",
   "details": null,
-  "featured": false,
+  "featured": true,
   "new": true,
   "closing": false,
   "endDate": null,

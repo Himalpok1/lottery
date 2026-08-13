@@ -32,7 +32,7 @@ def main():
 
     print("\nAccounts on this board:\n")
     for i, a in enumerate(accounts):
-        print(f"  {i + 1}. {a.get('name') or '(no name)'} — {a.get('phone')} — {a.get('role')}")
+        print(f"  {i + 1}. {a.get('name') or '(no name)'} — {a.get('role')} — PIN {a.get('pin')}")
     wipe_choice = len(accounts) + 1
     print(f"  {wipe_choice}. Wipe ALL accounts (start over with the owner setup screen)\n")
 
@@ -56,13 +56,13 @@ def main():
         sys.exit(1)
 
     acc = accounts[n - 1]
-    new_pin = input(f"New 4-6 digit PIN for {acc.get('name') or acc.get('phone')}: ").strip()
+    new_pin = input(f"New 4-6 digit PIN for {acc.get('name') or acc.get('id')}: ").strip()
     if not new_pin.isdigit() or not (4 <= len(new_pin) <= 6):
         print("PIN must be 4-6 digits.")
         sys.exit(1)
     acc["pin"] = new_pin
     save_state(state)
-    print(f"Done — {acc.get('name') or acc.get('phone')} can sign in with the new PIN.")
+    print(f"Done — {acc.get('name') or acc.get('id')} can sign in with the new PIN.")
     print("Restart server.py (or redeploy) if it's currently running.")
 
 

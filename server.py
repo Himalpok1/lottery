@@ -191,25 +191,18 @@ def save_state(state):
         return _rev
 
 
-# ---------------- accounts: phone number + PIN, per-store permissions ----------------
+# ---------------- accounts: PIN-only login, per-store permissions ----------------
 # Mirrors the browser's own model (see index.html's currentAccount/accountStoreIds):
 # owner sees and edits everything; manager edits their assigned store(s); clerk can only
-# log sales and push counter-app commands for their assigned store(s).
-_PHONE_DIGITS = re.compile(r"\D")
+# log sales and push counter-app commands for their assigned store(s). A PIN is unique
+# across the board's accounts — it's the only thing identifying who's signed in.
 
 
-def _norm_phone(p):
-    return _PHONE_DIGITS.sub("", p or "")
-
-
-def find_account(state, phone, pin):
-    if not state or not phone or not pin:
-        return None
-    phone_n = _norm_phone(phone)
-    if not phone_n:
+def find_account(state, pin):
+    if not state or not pin:
         return None
     for a in state.get("accounts", []):
-        if _norm_phone(a.get("phone", "")) == phone_n and str(a.get("pin", "")) == str(pin):
+        if str(a.get("pin", "")) == str(pin):
             return a
     return None
 
@@ -273,7 +266,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if m:
             return self._art(m.group(1))
         if self.path.startswith("/api/art"):   # pre-download every picture
-            acc = find_account(_state, self.headers.get("X-Phone"), self.headers.get("X-Pin"))
+            acc = find_account(_state, self.headers.get("X-Pin"))
             if not account_can_admin(acc):
                 return self._json({"error": "sign-in required"}, 401)
             return self._cache_all()
@@ -286,7 +279,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._proxy_img(url)
         # The browser can't read texaslottery.com (no CORS headers), but we can.
         if self.path.startswith("/api/tx"):
-            acc = find_account(_state, self.headers.get("X-Phone"), self.headers.get("X-Pin"))
+            acc = find_account(_state, self.headers.get("X-Pin"))
             if not account_can_admin(acc):
                 return self._json({"error": "sign-in required"}, 401)
             try:
@@ -416,7 +409,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             # the first Owner login, so there's nothing to check credentials against
             bootstrapping = not (_state and _state.get("accounts"))
             if not bootstrapping:
-                acc = find_account(_state, self.headers.get("X-Phone"), self.headers.get("X-Pin"))
+                acc = find_account(_state, self.headers.get("X-Pin"))
                 if account_can_admin(acc):
                     pass  # owner/manager: full write allowed
                 elif acc and acc.get("role") == "clerk":

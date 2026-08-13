@@ -485,7 +485,6 @@ tr:hover td{background:var(--r-lt)}
     <h2 id="lTitle">Sign in</h2>
     <p class="sub" id="lSub"></p>
     <div class="f" id="lNameWrap" style="display:none"><label>Your name</label><input id="lName" placeholder="Dave"></div>
-    <div class="f"><label>Phone number</label><input id="lPhone" inputmode="tel" placeholder="555 123 4567"></div>
     <div class="f"><label>PIN</label><input id="lPin" inputmode="numeric" maxlength="6" placeholder="4-6 digits"></div>
     <div class="lerr" id="lErr"></div>
     <button class="cbtn2" id="lGo" style="width:100%">Sign in</button>
@@ -504,12 +503,13 @@ tr:hover td{background:var(--r-lt)}
    · SOLO    — opened as a plain file. Falls back to this browser's own storage
                (fine for one machine; other devices won't see it).                     */
 const KEY='lotterydisplay.v1';
-/* ---------------- accounts: phone number + PIN, per-store permissions ----------------
+/* ---------------- accounts: PIN-only login, per-store permissions ----------------
    Roles:  owner   — everything, every store, manages stores & accounts
            manager — edit games/ads/jackpots/branding/sales for their assigned store(s)
            clerk   — counter app only, for their assigned store(s); no backend access
-   `stores` on an account is either the string 'all' (owner) or an array of store ids. */
-const normPhone=p=>String(p||'').replace(/\D/g,'');
+   `stores` on an account is either the string 'all' (owner) or an array of store ids.
+   Each account's PIN must be unique across the board — it's the only thing that
+   identifies who's signing in, so two accounts can't share one. */
 const currentAccount=()=>{
   const id=localStorage.getItem('ld.session');
   return id?(db.accounts||[]).find(a=>a.id===id)||null:null;
@@ -532,44 +532,42 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let tt;const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),1900)};
 
-/* the phone+PIN of whoever's signed in, sent with every write so the server can check
-   who's allowed to do what (see server.py's find_account/account_can_admin) */
-const authHeaders=()=>{const a=currentAccount();return a?{'X-Phone':a.phone||'','X-Pin':String(a.pin||'')}:{}};
+/* the PIN of whoever's signed in, sent with every write so the server can check who's
+   allowed to do what (see server.py's find_account/account_can_admin) */
+const authHeaders=()=>{const a=currentAccount();return a?{'X-Pin':String(a.pin||'')}:{}};
 
 function renderLogin(){
   const setup=!(db.accounts||[]).length;
   $('#lTitle').textContent=setup?'Create the owner login':'Sign in';
   $('#lSub').textContent=setup
-    ?'First time here — set up the master login for this board. You\'ll use this phone number and PIN on every device from now on.'
-    :'Enter the phone number and PIN your store gave you.';
+    ?'First time here — set up the master login for this board. You\'ll use this PIN on every device from now on.'
+    :'Enter your PIN.';
   $('#lNameWrap').style.display=setup?'':'none';
   // never clobber what's mid-typing — a poll landing between keystrokes would otherwise
   // wipe the field out from under whoever's signing in
-  const typingHere=document.activeElement&&['lPhone','lPin','lName'].includes(document.activeElement.id);
-  if(!typingHere){$('#lPhone').value='';$('#lPin').value='';$('#lName').value='';$('#lErr').textContent=''}
+  const typingHere=document.activeElement&&['lPin','lName'].includes(document.activeElement.id);
+  if(!typingHere){$('#lPin').value='';$('#lName').value='';$('#lErr').textContent=''}
   $('#lGo').textContent=setup?'Create & sign in':'Sign in';
   $('#lForgot').textContent=setup?''
     :'Forgot your PIN? Ask your Owner to reset it under Stores & accounts — or if you\'re the Owner, run reset_pin.py on the machine hosting this board.';
 }
 $('#lGo').onclick=()=>{
   const setup=!(db.accounts||[]).length;
-  const phone=normPhone($('#lPhone').value);
   const pin=$('#lPin').value.trim();
-  if(!phone){$('#lErr').textContent='Enter a phone number';return}
   if(!/^\d{4,6}$/.test(pin)){$('#lErr').textContent='PIN must be 4-6 digits';return}
   if(setup){
     const acc={id:'a'+Math.random().toString(36).slice(2,8),name:$('#lName').value.trim()||'Owner',
-      phone,pin,role:'owner',stores:'all'};
+      pin,role:'owner',stores:'all'};
     db.accounts=[acc];save();
     localStorage.setItem('ld.session',acc.id);
     toast('Owner account created');route();return;
   }
-  const acc=(db.accounts||[]).find(a=>normPhone(a.phone)===phone&&String(a.pin)===pin);
-  if(!acc){$('#lErr').textContent='Phone or PIN not recognized';return}
+  const acc=(db.accounts||[]).find(a=>String(a.pin)===pin);
+  if(!acc){$('#lErr').textContent='PIN not recognized';return}
   localStorage.setItem('ld.session',acc.id);
-  toast(`Welcome, ${acc.name||acc.phone}`);route();
+  toast(`Welcome, ${acc.name}`);route();
 };
-['lPhone','lPin','lName'].forEach(id=>$('#'+id).addEventListener('keydown',e=>{if(e.key==='Enter')$('#lGo').click()}));
+['lPin','lName'].forEach(id=>$('#'+id).addEventListener('keydown',e=>{if(e.key==='Enter')$('#lGo').click()}));
 
 /* push to the server, debounced — a burst of edits becomes one write */
 function push(){
@@ -768,6 +766,7 @@ const fresh=()=>{const s=newStore('Swing by Maypearl');return{stores:[s],active:
 const normalizeDb=d=>{
   if(!d)return d;
   if(!Array.isArray(d.accounts))d.accounts=[];
+  d.accounts.forEach(a=>{delete a.phone});  // login is PIN-only now
   (d.stores||[]).forEach(s=>{
     (s.games||[]).forEach(g=>{if(typeof g.status!=='string')g.status=''});  // stock override added later
     if(!s.lotto||typeof s.lotto!=='object')s.lotto={};
@@ -1107,7 +1106,7 @@ function pushCmd(mode,value=''){
 }
 function renderCounter(){
   const st=S(),cmd=db.cmd||{mode:'all'},acc=currentAccount();
-  $('#cWho').textContent=acc?`${acc.name||acc.phone} (${acc.role})`:'';
+  $('#cWho').textContent=acc?`${acc.name} (${acc.role})`:'';
   const used=[...new Set(st.games.filter(filled).map(g=>+g.price).filter(Boolean))].sort((a,b)=>a-b);
   $('#cPrices').innerHTML=(used.length?used:[1,2,5,10]).map(p=>
     `<button class="cb ${cmd.mode==='price'&&+cmd.value===p?'on':''}" data-price="${p}"><span class="pz">$${p}</span></button>`).join('');
@@ -1172,9 +1171,9 @@ function renderAdmin(){
   const tabs=visibleTabs(acc);
   if(!tabs.some(([k])=>k===aTab))aTab=tabs[0][0];
   $('#aStoreName').textContent=st.name;
-  $('#aWho').textContent=acc?(acc.name||acc.phone):'';
+  $('#aWho').textContent=acc?acc.name:'';
   $('#aWhoRole').textContent=acc?acc.role:'';
-  $('#aAvatar').textContent=acc?(acc.name||acc.phone||'?').trim().charAt(0).toUpperCase():'';
+  $('#aAvatar').textContent=acc?(acc.name||'?').trim().charAt(0).toUpperCase():'';
   const myStores=acc.role==='owner'?db.stores:db.stores.filter(s=>accountStoreIds(acc).includes(s.id));
   $('#aStore').innerHTML=myStores.map(s=>`<option value="${s.id}" ${s.id===db.active?'selected':''}>${esc(s.name)}</option>`).join('');
   $('#aTabs').innerHTML=tabs.map(([k,l])=>`<button class="vtab ${aTab===k?'on':''}" data-tab="${k}">${l}</button>`).join('');
@@ -1548,27 +1547,31 @@ function tabStores(st){
           `<button class="btn sm" data-stgo="${s.id}">Switch to</button> <button class="btn sm danger" data-stdel="${s.id}">Delete</button>`}</td></tr>`).join('')}
       </tbody></table></div></div>
 
-    <div class="panel"><div class="ph"><h3>Accounts</h3><span class="hint">Phone + PIN logins, and which stores each can use</span>
+    <div class="panel"><div class="ph"><h3>Accounts</h3><span class="hint">PIN logins, and which stores each can use</span>
       <div class="sp"></div><button class="btn sm go" id="acctAdd">Add account</button></div>
-    <div style="overflow-x:auto"><table><thead><tr><th style="width:150px">Name</th><th style="width:150px">Phone</th>
-      <th style="width:100px">PIN</th><th style="width:130px">Role</th><th>Stores</th><th style="width:70px"></th></tr></thead>
-      <tbody>${db.accounts.length?db.accounts.map((a,i)=>`<tr>
+    <div style="overflow-x:auto"><table><thead><tr><th style="width:170px">Name</th>
+      <th style="width:110px">PIN</th><th style="width:130px">Role</th><th>Stores</th><th style="width:70px"></th></tr></thead>
+      <tbody>${db.accounts.length?db.accounts.map((a,i)=>{
+        const dupe=a.pin&&db.accounts.some((b,j)=>j!==i&&String(b.pin)===String(a.pin));
+        return `<tr>
         <td><input class="in" data-ac="name" data-i="${i}" value="${esc(a.name)}" placeholder="Dave"></td>
-        <td><input class="in mono" data-ac="phone" data-i="${i}" value="${esc(a.phone)}" placeholder="5551234567"></td>
-        <td><input class="in mono" data-ac="pin" data-i="${i}" value="${esc(a.pin)}" maxlength="6" placeholder="4-6 digits"></td>
+        <td><input class="in mono" data-ac="pin" data-i="${i}" value="${esc(a.pin)}" maxlength="6" placeholder="4-6 digits"
+          style="${dupe?'border-color:var(--r)':''}" title="${dupe?'Another account already uses this PIN':''}"></td>
         <td><select class="in" data-ac="role" data-i="${i}">
           ${['owner','manager','clerk'].map(r=>`<option value="${r}" ${a.role===r?'selected':''}>${r[0].toUpperCase()+r.slice(1)}</option>`).join('')}</select></td>
         <td>${a.role==='owner'?'<span class="hint">All stores</span>':
           `<div style="display:flex;gap:10px;flex-wrap:wrap">${db.stores.map(s=>`<label class="chk">
             <input type="checkbox" data-acst="${i}" value="${s.id}" ${Array.isArray(a.stores)&&a.stores.includes(s.id)?'checked':''}>${esc(s.name)}</label>`).join('')}</div>`}</td>
-        <td>${db.accounts.length>1?`<button class="btn sm danger" data-acdel="${i}">Remove</button>`:''}</td></tr>`).join(''):
-        '<tr><td colspan="6" style="text-align:center;color:var(--ink-3);padding:26px">No accounts yet.</td></tr>'}
+        <td>${db.accounts.length>1?`<button class="btn sm danger" data-acdel="${i}">Remove</button>`:''}</td></tr>
+        ${dupe?`<tr><td colspan="5" style="padding:0 10px 8px;color:var(--r);font-size:12px">⚠ "${esc(a.name)}"'s PIN matches another account — give each person a different PIN</td></tr>`:''}`}).join(''):
+        '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:26px">No accounts yet.</td></tr>'}
       </tbody></table></div>
     <div class="pb"><div class="note"><div>
-      <b>Phone + PIN</b> is what someone types in at the TV's Backend or Counter app to sign in on any device — no accounts
-      elsewhere, no internet needed. <b>Owner</b> can do everything, on every store, including this list. <b>Manager</b> can edit
-      games, ads, jackpots, branding and view sales for the stores checked here, but can't touch the store list or this account
-      list. <b>Clerk</b> only gets the counter app — no backend access — for the stores checked here.<br><br>
+      <b>PIN</b> is what someone types in at the TV's Backend or Counter app to sign in on any device — no accounts
+      elsewhere, no internet needed. Each person needs their own PIN; two accounts can't share one. <b>Owner</b> can do
+      everything, on every store, including this list. <b>Manager</b> can edit games, ads, jackpots, branding and view sales
+      for the stores checked here, but can't touch the store list or this account list. <b>Clerk</b> only gets the counter
+      app — no backend access — for the stores checked here.<br><br>
       <b>Managing from anywhere</b> needs a hosted server — this app lives on this machine. What works today: run it on the
       counter PC and open the board on any device on the same Wi-Fi, and use <b>Back up</b> / <b>Restore</b> to carry a store's
       setup between machines.</div></div></div></div>`;
@@ -1838,7 +1841,7 @@ $('#aBody').addEventListener('click',async e=>{
   if(b.id==='wAdd'){st.winners.unshift({name:'',game:'',amount:'',date:''});save();reRender()}
   if(d.wdel!=null){st.winners.splice(i,1);save();reRender()}
 
-  if(b.id==='acctAdd'){db.accounts.push({id:'a'+Math.random().toString(36).slice(2,8),name:'',phone:'',pin:'',role:'clerk',stores:[db.active]});save();reRender()}
+  if(b.id==='acctAdd'){db.accounts.push({id:'a'+Math.random().toString(36).slice(2,8),name:'',pin:'',role:'clerk',stores:[db.active]});save();reRender()}
   if(d.acdel!=null){
     if(db.accounts.length<=1){toast('Keep at least one account, or you\'ll lock yourself out');return}
     if(db.accounts[i].id===currentAccount()?.id){toast('You can\'t remove the account you\'re signed in as');return}
