@@ -222,9 +222,9 @@ button{font-family:inherit}
 #counter{height:100vh;overflow:auto;background:#F7F8FA;color:#14171F}
 .cwrap{max-width:560px;margin:0 auto;padding:18px 16px 60px}
 .chead{display:flex;align-items:center;gap:10px;margin-bottom:16px}
-.chead h2{font-size:19px;margin:0;font-weight:800;color:#D62828}
+.chead h2{font-size:19px;margin:0;font-weight:800;color:var(--r)}
 .chead .st{margin-left:auto;font-family:var(--mono);font-size:11px;font-weight:800;color:#fff;
-  background:#D62828;padding:5px 9px;border-radius:999px}
+  background:var(--r);padding:5px 9px;border-radius:999px}
 .csec{background:#fff;border:1px solid #E2E5EA;border-radius:14px;padding:14px;margin-bottom:14px;
   box-shadow:0 1px 2px rgba(20,23,31,.05)}
 .csec h3{margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:#8A93A1;
@@ -234,36 +234,36 @@ button{font-family:inherit}
 .cb{background:#fff;border:1.5px solid #CFD4DC;border-radius:11px;padding:15px 8px;cursor:pointer;
   display:flex;flex-direction:column;align-items:center;gap:6px;font-weight:700;font-size:13px;
   color:#14171F;transition:.12s}
-.cb:hover{border-color:#D62828;color:#D62828;background:#FDECEC}
-.cb.on{background:#D62828;border-color:#D62828;color:#fff}
+.cb:hover{border-color:var(--r);color:var(--r);background:var(--r-lt)}
+.cb.on{background:var(--r);border-color:var(--r);color:#fff}
 .cb .ic{font-size:20px;line-height:1}
 .cb .pz{font-family:var(--mono);font-weight:800;font-size:17px}
 .cnum{display:flex;gap:8px}
 .cnum input{flex:1;padding:12px;border:1.5px solid #CFD4DC;border-radius:11px;font-family:var(--mono);
   font-weight:800;font-size:16px;text-align:center;background:#fff;color:#14171F}
-.cnum input:focus{border-color:#D62828;outline:none;box-shadow:0 0 0 3px #FDECEC}
-.cbtn2{background:#D62828;color:#fff;border:none;border-radius:11px;padding:12px 18px;font-weight:700;cursor:pointer}
-.cbtn2:hover{background:#A81E1E}
-.cbtn2.ghost{background:#fff;color:#D62828;border:1.5px solid #CFD4DC}
-.cbtn2.ghost:hover{border-color:#D62828;background:#FDECEC}
+.cnum input:focus{border-color:var(--r);outline:none;box-shadow:0 0 0 3px var(--r-lt)}
+.cbtn2{background:var(--r);color:#fff;border:none;border-radius:11px;padding:12px 18px;font-weight:700;cursor:pointer}
+.cbtn2:hover{background:var(--r-dk)}
+.cbtn2.ghost{background:#fff;color:var(--r);border:1.5px solid #CFD4DC}
+.cbtn2.ghost:hover{border-color:var(--r);background:var(--r-lt)}
 
 /* counter: section tabs + the mobile Lotto shift-entry screen */
 .ctabs{display:flex;gap:6px;margin-bottom:14px}
 .ctab{flex:1;padding:9px;font-size:12.5px;font-weight:700;border-radius:11px;border:1.5px solid #CFD4DC;
   background:#fff;color:#5B6472;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}
 .ctab .ic{font-size:17px;line-height:1}
-.ctab.on{background:#FDECEC;border-color:#D62828;color:#D62828}
+.ctab.on{background:var(--r-lt);border-color:var(--r);color:var(--r)}
 .cshifts{display:flex;gap:6px;margin-bottom:14px}
 .cshift{flex:1;padding:9px;font-size:13px;font-weight:700;border-radius:11px;border:1.5px solid #CFD4DC;
   background:#fff;color:#5B6472;cursor:pointer}
-.cshift.on{background:#D62828;border-color:#D62828;color:#fff}
+.cshift.on{background:var(--r);border-color:var(--r);color:#fff}
 .cmeter{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .cmeter .mf label{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:#8A93A1;
   font-weight:700;display:block;margin-bottom:4px}
 .cmeter .mf .v{font-size:16px;font-weight:800;font-family:var(--mono)}
 .cmeter .mf input{width:100%;height:34px;padding:0 10px;border:1.5px solid #CFD4DC;border-radius:9px;
   font-family:var(--mono);font-weight:700;font-size:13px;background:#fff;color:#14171F}
-.cmeter .mf input:focus{border-color:#D62828;outline:none}
+.cmeter .mf input:focus{border-color:var(--r);outline:none}
 .cos{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:11px;
   margin-bottom:14px;font-weight:700;font-size:12.5px}
 .csearch{width:100%;height:32px;padding:0 10px;border:1.5px solid #CFD4DC;border-radius:9px;
@@ -275,7 +275,7 @@ button{font-family:inherit}
 .cboxrow .nm .p{font-size:11px;color:#8A93A1;margin:0}
 .cboxrow input{width:56px;height:32px;text-align:center;font-family:var(--mono);font-weight:700;
   font-size:13px;border:1.5px solid #CFD4DC;border-radius:8px;background:#fff;color:#14171F;flex:0 0 auto}
-.cboxrow input:focus{border-color:#D62828;outline:none}
+.cboxrow input:focus{border-color:var(--r);outline:none}
 .cboxrow .delta{width:44px;text-align:right;font-size:11px;flex:0 0 auto}
 .cboxrow.out input{border-color:#D9534F}
 .cboxrow.newbook{background:#FDF3E3}
@@ -407,13 +407,13 @@ tr:hover td{background:var(--r-lt)}
 #login{height:100vh;overflow:auto;background:#F7F8FA;color:#14171F;display:flex;align-items:center;justify-content:center;padding:20px}
 .lcard{max-width:380px;width:100%;background:#fff;border:1px solid #E2E5EA;border-radius:16px;padding:28px 26px;
   box-shadow:0 4px 24px rgba(20,23,31,.08)}
-.lcard h2{margin:0 0 4px;font-size:20px;font-weight:800;color:#D62828}
+.lcard h2{margin:0 0 4px;font-size:20px;font-weight:800;color:var(--r)}
 .lcard .sub{margin:0 0 18px;font-size:13px;color:#5B6472;line-height:1.5}
 .lcard .f{margin-bottom:13px}
 .lcard .f label{font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:#8A93A1;font-weight:700;display:block;margin-bottom:5px}
 .lcard .f input{width:100%;padding:11px 12px;border:1.5px solid #CFD4DC;border-radius:9px;font-family:var(--body);
   font-size:15px;background:#fff;color:#14171F}
-.lcard .f input:focus{border-color:#D62828;outline:none;box-shadow:0 0 0 3px #FDECEC}
+.lcard .f input:focus{border-color:var(--r);outline:none;box-shadow:0 0 0 3px var(--r-lt)}
 .lerr{color:#D62828;font-size:12.5px;min-height:15px;margin:-4px 0 12px}
 .lwho{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2)}
 .lwho b{color:var(--ink)}
@@ -783,6 +783,10 @@ const THEMES={
   crimson:{name:'Crimson Rush',bg:'#2A0A0F',bg2:'#5E1220',text:'#FFF0F0',accent:'#FFC46B'}
 };
 const ACCENTS=['#D62828','#C1121F','#E8C46A','#FF3D9A','#4FC3F7','#6BBF59','#8E6FCF','#14171F','#FFFFFF'];
+/* curated for the Backend/Counter app specifically — every one of these still reads
+   clearly with white button text, unlike ACCENTS above (which includes white/pale
+   picks meant for a TV legend dot, not a solid button fill) */
+const APP_ACCENTS=['#D62828','#C1121F','#B8541F','#1D7A4C','#0F766E','#2563AA','#5A46C4','#8E2A7D','#3D4451'];
 /* light themes need the opposite surfaces or the tiles vanish into the background */
 const LIGHT_VARS={'--tile':'#FFFFFF','--tileBd':'#E2E5EC','--barBg':'#FFFFFF','--railBg':'#FAFBFC',
   '--chipBg':'#14171F','--chipInk':'#FFFFFF','--slotBg':'var(--accent)','--slotInk':'#FFFFFF',
@@ -805,7 +809,7 @@ const blankGames=()=>Array.from({length:40},(_,i)=>({
 const newStore=(name)=>({
   id:'s'+Math.random().toString(36).slice(2,8),name,
   brand:{title:name,sub:'Scratch-Offs',logo:'',theme:'texas',accent:'#D62828',
-         bgType:'theme',bgImage:'',bgVideo:''},
+         bgType:'theme',bgImage:'',bgVideo:'',appAccent:'#D62828'},
   view:{cols:'auto',empty:'show',sort:'slot',endingAt:3,tile:'card',slots:40,lottoShifts:1,lottoShiftNames:['Shift 1','Shift 2'],showJp:false,showDraws:true,showAds:true,showWinners:false,adSecs:8},
   games:blankGames(),ads:[],jackpots:[],winners:[],sales:{},lotto:{},lottoBoxPrices:[...LOTTO_BOX_PRICES],feedUrl:''
 });
@@ -821,6 +825,7 @@ const normalizeDb=d=>{
   (d.stores||[]).forEach(s=>{
     (s.games||[]).forEach(g=>{if(typeof g.status!=='string')g.status=''});  // stock override added later
     if(!s.lotto||typeof s.lotto!=='object')s.lotto={};
+    if(s.brand&&!s.brand.appAccent)s.brand.appAccent='#D62828';  // Backend/Counter color, separate from the TV's theme
     if(s.view){s.view.showJp=false;s.view.showWinners=false}  // Jackpots/Winners tabs retired — keep the TV strips off too
     if(!(+((s.view||{}).lottoShifts)))((s.view=s.view||{}).lottoShifts=1);
     if(!Array.isArray((s.view||{}).lottoShiftNames))s.view.lottoShiftNames=['Shift 1','Shift 2'];
@@ -963,6 +968,21 @@ function applyTheme(st){
   r.setProperty('--cols',+st.view.cols||5); // 'auto' keeps the fallback; fitGrid sets real tracks
   const vars=t.light?LIGHT_VARS:DARK_VARS;
   Object.entries(vars).forEach(([k,v])=>r.setProperty(k,v));
+}
+/* mix a hex color toward black (negative percent) or white (positive), same trick
+   browsers' own devtools color pickers use for a quick shade/tint */
+function shadeHex(hex,percent){
+  const f=parseInt((hex||'#D62828').slice(1),16),t=percent<0?0:255,p=Math.abs(percent);
+  const R=f>>16,G=f>>8&0xFF,B=f&0xFF;
+  return '#'+(0x1000000+(Math.round((t-R)*p)+R)*0x10000+(Math.round((t-G)*p)+G)*0x100+(Math.round((t-B)*p)+B)).toString(16).slice(1);
+}
+/* the Backend and Counter app's own color — separate from the TV board's theme, since
+   a store might want a calm blue backend even with a bold neon TV, or vice versa */
+function applyAppTheme(st){
+  const c=(st&&st.brand&&st.brand.appAccent)||'#D62828',r=document.documentElement.style;
+  r.setProperty('--r',c);
+  r.setProperty('--r-dk',shadeHex(c,-0.22));
+  r.setProperty('--r-lt',shadeHex(c,0.92));
 }
 function renderBg(st){
   const L=$('#bgLayer'),b=st.brand;
@@ -1421,6 +1441,22 @@ function tabBrand(st){
           <div class="swatch">${ACCENTS.map(c=>`<button class="sw ${b.accent===c?'on':''}" data-accent="${c}" style="background:${c}"></button>`).join('')}
             <input type="color" id="bAcc" value="${b.accent}" style="width:34px;height:34px;padding:1px;border:1.5px solid var(--bd-2);border-radius:8px;background:#fff">
           </div></div></div>
+      </div></div>
+
+    <div class="panel"><div class="ph"><h3>App theme</h3><span class="hint">Colors the Backend and Counter app — separate from the TV's own theme above</span></div>
+      <div class="pb">
+        <div style="display:flex;gap:16px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+          <div style="display:flex;gap:8px;align-items:center;padding:10px 14px;border:1px solid var(--bd);border-radius:12px;background:var(--sf-2)">
+            <button class="btn sm go" style="background:${esc(b.appAccent||'#D62828')};border-color:${esc(b.appAccent||'#D62828')};pointer-events:none">Open TV board</button>
+            <button class="tab on" style="background:${shadeHex(b.appAccent||'#D62828',0.92)};color:${esc(b.appAccent||'#D62828')};pointer-events:none">Active tab</button>
+          </div>
+          <div class="hint" style="max-width:280px">This is what your buttons and active menu items look like — pick something that reads clearly with white text.</div>
+        </div>
+        <div class="f"><label>App color</label>
+          <div class="swatch">${APP_ACCENTS.map(c=>`<button class="sw ${(b.appAccent||'#D62828')===c?'on':''}" data-appaccent="${c}" style="background:${c}"></button>`).join('')}
+            <input type="color" id="bAppAcc" value="${b.appAccent||'#D62828'}" style="width:34px;height:34px;padding:1px;border:1.5px solid var(--bd-2);border-radius:8px;background:#fff">
+          </div>
+        </div>
       </div></div>
 
     <div class="panel"><div class="ph"><h3>Background</h3><span class="hint">Theme color, an image, or a looping video</span></div>
@@ -1891,7 +1927,7 @@ function txAutoFill(st){
 /* the counter's Lotto tab reuses this same delegated logic (see the shared
    input/change/click listeners below, attached to both #aBody and #cLotto) —
    so reRender needs to redraw whichever of the two is actually on screen */
-function reRender(){location.hash==='#counter'?renderCounter():renderAdmin()}
+function reRender(){applyAppTheme(S());location.hash==='#counter'?renderCounter():renderAdmin()}
 $('#aTabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(!b)return;aTab=b.dataset.tab;renderAdmin()});
 $('#aStore').addEventListener('change',e=>{db.active=e.target.value;save();renderAdmin()});
 
@@ -1936,6 +1972,7 @@ function bodyChangeHandler(e){
   if(el.id==='bTile'){st.view.tile=el.value;save();reRender()}
   if(el.id==='bBgType'){st.brand.bgType=el.value;save();reRender()}
   if(el.id==='bAcc'){st.brand.accent=el.value;save();reRender()}
+  if(el.id==='bAppAcc'){st.brand.appAccent=el.value;save();reRender()}
   if(el.id==='adOn'){st.view.showAds=el.checked;save()}
   if(el.id==='jpOn'){st.view.showJp=el.checked;save()}
   if(el.id==='dwOn'){st.view.showDraws=el.checked;save()}
@@ -2004,6 +2041,7 @@ async function bodyClickHandler(e){
   if(b.id==='bBgDel'){st.brand.bgImage='';st.brand.bgType='theme';save();reRender();toast('Background cleared')}
   if(d.theme){st.brand.theme=d.theme;st.brand.accent=THEMES[d.theme].accent;save();reRender();toast(THEMES[d.theme].name)}
   if(d.accent){st.brand.accent=d.accent;save();reRender()}
+  if(d.appaccent){st.brand.appAccent=d.appaccent;save();reRender()}
 
   if(b.id==='adAdd'){st.ads.push({kick:'In store now',text:'',img:''});save();reRender()}
   if(d.adpick!=null){const img=await pickImage(520);if(img){st.ads[i].img=img;save();reRender();toast('Picture added')}}
@@ -2152,6 +2190,7 @@ function showOnly(which){
   $('#chrome').classList.toggle('hidden',which!=='board');
 }
 function route(){
+  applyAppTheme(S());  // Backend/Counter/login color — independent of which surface is showing
   const h=location.hash;
   const isAdmin=h==='#admin',isCounter=h==='#counter';
   if(isAdmin||isCounter){
