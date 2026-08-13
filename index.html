@@ -154,10 +154,13 @@ button{font-family:inherit}
 .tc.empty{background:transparent;border:1px dashed var(--tileBd);box-shadow:none}
 .tcArt{flex:1 1 auto;position:relative;min-height:0;display:flex;align-items:center;justify-content:center;
   overflow:hidden}
-/* zoom in and anchor to the bottom, cropping off the price/game-number strip the
-   state prints across the top of every ticket photo — our own slot badge covers that job */
+/* zoom in and anchor to the bottom by default, cropping off the price/game-number strip
+   the state prints across the top of every ticket photo — our own badges cover that job.
+   Anchor is configurable under Branding > Ticket properties for art that crops badly. */
 .tcArt img{position:absolute;left:50%;bottom:0;transform:translateX(-50%);
   width:122%;height:122%;object-fit:cover;display:block}
+.tcArt.pic-top img{bottom:auto;top:0}
+.tcArt.pic-middle img{bottom:auto;top:50%;transform:translate(-50%,-50%)}
 .tcArt .noart{font-family:var(--mono);font-size:calc(var(--cell)*.03);color:#9CA3AF;text-align:center;line-height:1.4;padding:calc(var(--cell)*.03)}
 .tcArt .pxy{font-family:var(--display);color:#111827;text-align:center;line-height:1.05;padding:calc(var(--cell)*.03)}
 .tcArt .pxy b{display:block;font-size:calc(var(--cell)*.075)}
@@ -173,13 +176,13 @@ button{font-family:inherit}
   box-shadow:0 2px 8px rgba(0,0,0,.4);z-index:2}
 .slotB.left{left:calc(var(--cell)*.03);transform:none}
 .slotB.right{left:auto;right:calc(var(--cell)*.03);transform:none}
-/* the ticket price — a folded-corner ribbon banner. Solid black on white, sized to
-   match the slot badge, so it reads instantly from across the room — tier colour was
-   too soft to read at a glance, this is the same call as the state's own price tags */
-.priceB{position:absolute;left:0;top:0;width:64%;height:64%;overflow:hidden;z-index:2;pointer-events:none}
-.priceB i{position:absolute;left:-33%;top:23%;width:150%;transform:rotate(-45deg);transform-origin:center;
+/* the ticket price — a folded-corner ribbon banner, tucked into just the corner so the
+   band itself doesn't slice across the middle of the ticket art. Text stays big (solid
+   black on white) even though the ribbon's footprint is small — that's the whole point */
+.priceB{position:absolute;left:0;top:0;width:40%;height:40%;overflow:hidden;z-index:2;pointer-events:none}
+.priceB i{position:absolute;left:-30%;top:15%;width:150%;transform:rotate(-45deg);transform-origin:center;
   background:#fff;color:#14161C;text-align:center;font-family:var(--mono);font-weight:800;
-  font-style:normal;font-size:calc(var(--cell)*.075);letter-spacing:.01em;padding:calc(var(--cell)*.024) 0;
+  font-style:normal;font-size:calc(var(--cell)*.075);letter-spacing:.01em;padding:calc(var(--cell)*.02) 0;
   box-shadow:0 1px 6px rgba(0,0,0,.35)}
 /* the state's own CLOSING SOON corner ribbon */
 .ribbon{position:absolute;right:0;bottom:0;width:60%;height:60%;overflow:hidden;z-index:2;pointer-events:none}
@@ -1046,11 +1049,12 @@ function cardTile(g,i,st,mods={}){
   const showSlot=st.view.showSlot!==false,showPrice=st.view.showPrice!==false;
   const slotPos=st.view.slotPos&&st.view.slotPos!=='middle'?' '+st.view.slotPos:'';
   const slotHtml=showSlot?`<div class="slotB${slotPos}">${String(g.slot).padStart(2,'0')}</div>`:'';
+  const picClass=st.view.picPos&&st.view.picPos!=='bottom'?' pic-'+st.view.picPos:'';
   if(!filled(g))return art
-    ? `<div class="tc stock" style="--i:${i}"><div class="tcArt">${slotHtml}${art}</div></div>`
-    : `<div class="tc empty" style="--i:${i}"><div class="tcArt">${slotHtml}<div class="noart">open slot</div></div></div>`;
+    ? `<div class="tc stock" style="--i:${i}"><div class="tcArt${picClass}">${slotHtml}${art}</div></div>`
+    : `<div class="tc empty" style="--i:${i}"><div class="tcArt${picClass}">${slotHtml}<div class="noart">open slot</div></div></div>`;
   return `<div class="tc ${mods.dim?'dim':''} ${mods.pick?'pick':''} ${art?'stock':''}" style="--i:${i};--c:${c}">
-    <div class="tcArt">
+    <div class="tcArt${picClass}">
       ${slotHtml}
       ${showPrice&&g.price!==''?`<div class="priceB"><i>$${esc(g.price)}</i></div>`:''}
       ${art||(g.img?`${imgTag(g)}<div class="pxy" style="display:none"><b>${g.price!==''?'$'+esc(g.price):'—'}</b><s>${g.no?'#'+esc(g.no):''}</s></div>`
@@ -1568,6 +1572,10 @@ function tabBrand(st){
           <option value="middle" ${(!st.view.slotPos||st.view.slotPos==='middle')?'selected':''}>Middle</option>
           <option value="right" ${st.view.slotPos==='right'?'selected':''}>Right</option></select></div>
         <div class="f"><label class="chk" style="margin:0"><input type="checkbox" id="bShowPrice" ${st.view.showPrice!==false?'checked':''}> Show ticket price</label></div>
+        <div class="f"><label>Ticket picture position</label><select id="bPicPos" title="Which part of the ticket photo shows through — the state prints a price/game-number strip across the top of every photo, so Bottom (the default) is usually the cleanest crop">
+          <option value="top" ${st.view.picPos==='top'?'selected':''}>Top</option>
+          <option value="middle" ${st.view.picPos==='middle'?'selected':''}>Middle</option>
+          <option value="bottom" ${(!st.view.picPos||st.view.picPos==='bottom')?'selected':''}>Bottom</option></select></div>
       </div></div></div>`;
 }
 function tabAds(st){
@@ -2229,6 +2237,7 @@ function bodyChangeHandler(e){
   if(el.id==='bShowSlot'){st.view.showSlot=el.checked;save();reRender()}
   if(el.id==='bSlotPos'){st.view.slotPos=el.value;save();reRender()}
   if(el.id==='bShowPrice'){st.view.showPrice=el.checked;save();reRender()}
+  if(el.id==='bPicPos'){st.view.picPos=el.value;save();reRender()}
   if(el.id==='bBgType'){st.brand.bgType=el.value;save();reRender()}
   if(el.id==='bAcc'){st.brand.accent=el.value;save();reRender()}
   if(el.id==='bAppAcc'){st.brand.appAccent=el.value;save();reRender()}
