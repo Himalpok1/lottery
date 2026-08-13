@@ -311,6 +311,12 @@ button{font-family:inherit}
   font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%}
 .vtab:hover{color:var(--r);background:var(--r-lt)}
 .vtab.on{background:var(--r-lt);color:var(--r);font-weight:800}
+/* small inline period-selector pills — chart range, top-sellers range, etc. */
+.ptabs{display:flex;gap:4px;flex-wrap:wrap}
+.ptab{background:transparent;color:var(--ink-2);border:1px solid var(--bd-2);border-radius:999px;
+  padding:5px 11px;font-size:12px;font-weight:700;cursor:pointer}
+.ptab:hover{border-color:var(--r);color:var(--r)}
+.ptab.on{background:var(--r);border-color:var(--r);color:#fff}
 /* quiet footer: connection dot, one prominent action, small utility links, account —
    nothing here competes visually with the nav list above it */
 .aFoot{border-top:1px solid var(--bd);padding:12px 14px 14px;display:flex;flex-direction:column;gap:10px}
@@ -811,7 +817,7 @@ const newStore=(name)=>({
   brand:{title:name,sub:'Scratch-Offs',logo:'',theme:'texas',accent:'#D62828',
          bgType:'theme',bgImage:'',bgVideo:'',appAccent:'#D62828'},
   view:{cols:'auto',empty:'show',sort:'slot',endingAt:3,tile:'card',slots:40,lottoShifts:1,lottoShiftNames:['Shift 1','Shift 2'],showJp:false,showDraws:true,showAds:true,showWinners:false,adSecs:8},
-  games:blankGames(),ads:[],jackpots:[],winners:[],sales:{},lotto:{},lottoBoxPrices:[...LOTTO_BOX_PRICES],feedUrl:''
+  games:blankGames(),ads:[],jackpots:[],winners:[],sales:{},lotto:{},lottoBoxPrices:[...LOTTO_BOX_PRICES],intake:[],feedUrl:''
 });
 const fresh=()=>{const s=newStore('Swing by Maypearl');return{stores:[s],active:s.id,
   cmd:{mode:'all',value:'',at:0,holdSecs:30},accounts:[]}};
@@ -825,6 +831,7 @@ const normalizeDb=d=>{
   (d.stores||[]).forEach(s=>{
     (s.games||[]).forEach(g=>{if(typeof g.status!=='string')g.status=''});  // stock override added later
     if(!s.lotto||typeof s.lotto!=='object')s.lotto={};
+    if(!Array.isArray(s.intake))s.intake=[];  // ticket-lifecycle log: confirmed -> activated
     if(s.brand&&!s.brand.appAccent)s.brand.appAccent='#D62828';  // Backend/Counter color, separate from the TV's theme
     if(s.view){s.view.showJp=false;s.view.showWinners=false}  // Jackpots/Winners tabs retired — keep the TV strips off too
     if(!(+((s.view||{}).lottoShifts)))((s.view=s.view||{}).lottoShifts=1);
@@ -1300,7 +1307,8 @@ function logSale(price){
 /* ---------------- BACKEND ---------------- */
 let aTab='home';
 const TABS=[['home','Home'],['games','Games'],['brand','Branding'],['ads','Advertisements'],
-  ['sales','Sales'],['lotto','Lotto Reporting'],['stores','Stores & accounts'],['data','Lottery data']];
+  ['sales','Sales'],['insights','Sales Insights'],['intake','Inventory'],
+  ['lotto','Lotto Reporting'],['stores','Stores & accounts'],['data','Lottery data']];
 /* Stores & accounts (adding/removing stores, managing who can log in) is Owner-only —
    a manager can run their store day to day but can't touch the store list or accounts */
 const visibleTabs=acc=>acc&&acc.role==='owner'?TABS:TABS.filter(([k])=>k!=='stores');
@@ -1351,7 +1359,7 @@ function renderAdmin(){
   $('#aStore').innerHTML=myStores.map(s=>`<option value="${s.id}" ${s.id===db.active?'selected':''}>${esc(s.name)}</option>`).join('');
   $('#aTabs').innerHTML=tabs.map(([k,l])=>`<button class="vtab ${aTab===k?'on':''}" data-tab="${k}">${l}</button>`).join('');
   $('#aBody').innerHTML=({home:tabHome,games:tabGames,brand:tabBrand,ads:tabAds,jackpots:tabJp,winners:tabWin,
-    sales:tabSales,lotto:tabLotto,stores:tabStores,data:tabData}[aTab]||tabGames)(st);
+    sales:tabSales,insights:tabInsights,intake:tabIntake,lotto:tabLotto,stores:tabStores,data:tabData}[aTab]||tabGames)(st);
 }
 function tabGames(st){
   const n=slotCount(st);
@@ -1576,6 +1584,144 @@ function tabSales(st){
             <td><b>${s.t}</b></td><td style="color:#157F3B"><b>$${s.r}</b></td></tr>`}).join(''):
           `<tr><td colspan="${PRICES.length+3}" style="text-align:center;color:var(--ink-3);padding:26px">No sales logged. Use the counter app's "Log a sale" buttons.</td></tr>`}
         </tbody></table></div></div>`;
+}
+
+/* ---------------- Sales Insights: revenue trend + top price tiers ---------------- */
+const addDays=(ymd,delta)=>{const[y,m,d]=ymd.split('-').map(Number);return new Date(y,m-1,d+delta).toISOString().slice(0,10)};
+const monthKeyOf=(y,m)=>`${y}-${String(m).padStart(2,'0')}`;   // m is 1-indexed
+const daysInMonth=(y,m)=>new Date(y,m,0).getDate();
+function periodSum(st,fromDate,toDate){
+  let t=0,r=0;
+  Object.keys(st.sales).forEach(d=>{
+    if(d>=fromDate&&d<=toDate)Object.entries(st.sales[d]).forEach(([p,n])=>{t+=n;r+=n*+p});
+  });
+  return{t,r};
+}
+const intakeStats=st=>{
+  const sum=arr=>arr.reduce((a,b)=>{const t=+b.qty||0,r=t*(+b.price||0);return{t:a.t+t,r:a.r+r}},{t:0,r:0});
+  const conf=sum((st.intake||[]).filter(b=>b.stage==='confirmed'));
+  const act=sum((st.intake||[]).filter(b=>b.stage==='activated'));
+  return{confirmed:conf,activated:act,inventory:{t:conf.t+act.t,r:conf.r+act.r}};
+};
+let insightsChart='month',insightsRange='week';
+function tabInsights(st){
+  const today=new Date(),todayStr=today.toISOString().slice(0,10);
+  const ty=today.getFullYear(),tm=today.getMonth()+1;   // tm is 1-indexed
+  const thisMonthKey=monthKeyOf(ty,tm);
+  const lmDate=new Date(ty,tm-2,1),lastMonthKey=monthKeyOf(lmDate.getFullYear(),lmDate.getMonth()+1);
+  const dayOfMonth=today.getDate(),totalDaysThisMonth=daysInMonth(ty,tm);
+
+  const thisMonth=periodSum(st,thisMonthKey+'-01',thisMonthKey+'-31');
+  const lastMonth=periodSum(st,lastMonthKey+'-01',lastMonthKey+'-31');
+  const projected=Math.round(thisMonth.r/dayOfMonth*totalDaysThisMonth);
+  const inv=intakeStats(st);
+
+  // trend chart — daily for this/last month, monthly totals for the last 12 months
+  let chartPts=[];
+  if(insightsChart==='yearly'){
+    chartPts=Array.from({length:12},(_,i)=>{
+      const dt=new Date(ty,tm-1-(11-i),1),key=monthKeyOf(dt.getFullYear(),dt.getMonth()+1);
+      return{label:dt.toLocaleString('en-US',{month:'short'}),value:periodSum(st,key+'-01',key+'-31').r};
+    });
+  }else{
+    const key=insightsChart==='lastmonth'?lastMonthKey:thisMonthKey;
+    const[yy,mm]=key.split('-').map(Number),n=daysInMonth(yy,mm);
+    chartPts=Array.from({length:n},(_,i)=>{
+      const ds=`${key}-${String(i+1).padStart(2,'0')}`;
+      return{label:String(i+1),value:periodSum(st,ds,ds).r};
+    });
+  }
+  const maxVal=Math.max(1,...chartPts.map(p=>p.value));
+  const W=760,H=190,PAD=8;
+  const stepX=chartPts.length>1?(W-PAD*2)/(chartPts.length-1):0;
+  const coords=chartPts.map((p,i)=>[PAD+i*stepX,H-PAD-(p.value/maxVal)*(H-PAD*2)]);
+  const line=coords.map(c=>c.join(',')).join(' ');
+  const area=`${PAD},${H-PAD} ${line} ${W-PAD},${H-PAD}`;
+  const showEvery=Math.max(1,Math.ceil(chartPts.length/14));
+
+  // top price tiers for the selected range
+  const rangeFrom=insightsRange==='week'?addDays(todayStr,-6):insightsRange==='month'?thisMonthKey+'-01':
+    insightsRange==='lastmonth'?lastMonthKey+'-01':'0000-01-01';
+  const rangeTo=insightsRange==='lastmonth'?lastMonthKey+'-31':todayStr;
+  const perPrice={};
+  Object.keys(st.sales).forEach(d=>{
+    if(d>=rangeFrom&&d<=rangeTo)Object.entries(st.sales[d]).forEach(([p,n])=>{
+      perPrice[p]=perPrice[p]||{t:0,r:0};perPrice[p].t+=n;perPrice[p].r+=n*+p;
+    });
+  });
+  const leaders=Object.entries(perPrice).map(([p,s])=>({p:+p,...s})).sort((a,b)=>b.r-a.r);
+
+  return `<div class="cards">
+      <div class="stat"><div class="k">This month sale</div><div class="v">$${thisMonth.r.toLocaleString()}</div></div>
+      <div class="stat"><div class="k">Last month sale</div><div class="v">$${lastMonth.r.toLocaleString()}</div></div>
+      <div class="stat"><div class="k">Projected sale</div><div class="v">$${projected.toLocaleString()}</div></div>
+      <div class="stat"><div class="k">Confirmed</div><div class="v">${inv.confirmed.t} · $${inv.confirmed.r.toLocaleString()}</div></div>
+      <div class="stat"><div class="k">Activated</div><div class="v">${inv.activated.t} · $${inv.activated.r.toLocaleString()}</div></div>
+      <div class="stat"><div class="k">Inventory on hand</div><div class="v">${inv.inventory.t} · $${inv.inventory.r.toLocaleString()}</div></div>
+    </div>
+    <div class="panel"><div class="ph"><h3>Revenue trend</h3><span class="hint">From tickets logged in the counter app</span>
+      <div class="sp"></div>
+      <div class="ptabs">
+        ${[['month','This month'],['lastmonth','Last month'],['yearly','Monthly']].map(([k,l])=>
+          `<button class="ptab ${insightsChart===k?'on':''}" data-ichart="${k}">${l}</button>`).join('')}
+      </div></div>
+      <div class="pb"><div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${H+22}" style="width:100%;min-width:520px;height:200px">
+        <polygon points="${area}" fill="var(--r-lt)" opacity="0.6"></polygon>
+        <polyline points="${line}" fill="none" stroke="var(--r)" stroke-width="2"></polyline>
+        ${coords.map(([x,y])=>`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.2" fill="var(--r)"></circle>`).join('')}
+        ${chartPts.map((p,i)=>i%showEvery===0?`<text x="${coords[i][0].toFixed(1)}" y="${H+16}" font-size="10" fill="var(--ink-3)" text-anchor="middle">${esc(p.label)}</text>`:'').join('')}
+      </svg></div></div></div>
+    <div class="panel"><div class="ph"><h3>Top price tiers</h3><span class="hint">Ranked by revenue — we track sales by price, not by individual game</span>
+      <div class="sp"></div>
+      <div class="ptabs">
+        ${[['week','This week'],['month','This month'],['lastmonth','Last month'],['all','All time']].map(([k,l])=>
+          `<button class="ptab ${insightsRange===k?'on':''}" data-irange="${k}">${l}</button>`).join('')}
+      </div></div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th style="width:70px">Rank</th><th>Price tier</th><th style="width:120px">Tickets</th><th style="width:140px">Revenue</th></tr></thead>
+        <tbody>${leaders.length?leaders.map((l,i)=>`<tr>
+          <td class="rno">#${i+1}</td><td><span class="lg" style="--c:${tierColor(l.p)};display:inline-flex"><i></i>$${l.p}</span></td>
+          <td class="rno">${l.t}</td><td style="color:#157F3B"><b>$${l.r.toLocaleString()}</b></td></tr>`).join(''):
+          '<tr><td colspan="4" style="text-align:center;color:var(--ink-3);padding:26px">No sales in this range yet.</td></tr>'}
+        </tbody></table></div></div>`;
+}
+
+/* ---------------- Inventory: ticket lifecycle — confirmed, then activated ---------------- */
+let intakeAddNo='';
+function tabIntake(st){
+  st.intake=st.intake||[];
+  const inv=intakeStats(st);
+  const rows=st.intake.map((b,i)=>({b,i})).sort((a,b)=>(b.b.date||'').localeCompare(a.b.date||''));
+  return `<div class="cards">
+      <div class="stat"><div class="k">Confirmed</div><div class="v">${inv.confirmed.t} tickets</div><div class="hint" style="margin-top:4px">$${inv.confirmed.r.toLocaleString()}</div></div>
+      <div class="stat"><div class="k">Activated</div><div class="v">${inv.activated.t} tickets</div><div class="hint" style="margin-top:4px">$${inv.activated.r.toLocaleString()}</div></div>
+      <div class="stat"><div class="k">Inventory on hand</div><div class="v">${inv.inventory.t} tickets</div><div class="hint" style="margin-top:4px">$${inv.inventory.r.toLocaleString()}</div></div>
+    </div>
+    <div class="panel"><div class="ph"><h3>Log new tickets</h3><span class="hint">A pack arrives → confirm it → activate it when it goes on the floor</span></div>
+      <div class="pb"><div class="fields">
+        <div class="f" style="flex:1;min-width:240px"><label>Game</label>
+          <select id="intakeGame"><option value="">— pick from the catalog —</option>
+            ${TX.map(t=>`<option value="${esc(t.no)}" ${intakeAddNo===t.no?'selected':''}>${esc(t.no)} · ${esc((t.name||'').slice(0,28))} ($${t.price})</option>`).join('')}
+          </select></div>
+        <div class="f"><label>Quantity</label><input id="intakeQty" class="mono" type="number" min="1" placeholder="150" style="width:100px"></div>
+        <div class="f"><label>Date</label><input id="intakeDate" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+        <button class="btn go" id="intakeAdd" style="align-self:flex-end">Log as confirmed</button>
+      </div></div></div>
+    <div class="panel"><div class="ph"><h3>Batches</h3><span class="hint">${st.intake.length} logged</span></div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th style="width:110px">Date</th><th>Game</th><th style="width:70px">Price</th><th style="width:90px">Qty</th>
+          <th style="width:110px">Amount</th><th style="width:110px">Stage</th><th style="width:160px"></th></tr></thead>
+        <tbody>${rows.length?rows.map(({b,i})=>`<tr>
+          <td class="rno">${esc(b.date)}</td><td>${esc(b.gameName)||'<span style="color:var(--ink-3)">—</span>'}</td>
+          <td class="rno">$${esc(b.price)}</td><td class="rno">${esc(b.qty)}</td>
+          <td class="rno">$${((+b.qty||0)*(+b.price||0)).toLocaleString()}</td>
+          <td>${b.stage==='activated'?'<span class="rno" style="color:#157F3B">ACTIVATED</span>':'<span class="rno" style="color:#B8860B">CONFIRMED</span>'}</td>
+          <td>${b.stage==='confirmed'?`<button class="btn sm go" data-intakeact="${i}">Activate</button> `:''}<button class="btn sm danger" data-intakedel="${i}">Remove</button></td></tr>`).join(''):
+          '<tr><td colspan="7" style="text-align:center;color:var(--ink-3);padding:26px">No batches logged yet.</td></tr>'}
+        </tbody></table></div>
+      <div class="pb"><div class="note"><div><b>Confirmed</b> is a pack you've received and acknowledged but haven't put out for sale yet.
+        <b>Activated</b> means it's live on the floor. <b>Inventory on hand</b> is simply confirmed + activated — everything you're
+        holding that hasn't been reported as fully sold. Remove a batch once it's sold through.</div></div></div></div>`;
 }
 /* Lotto machine reconciliation, mirroring the Fina Waxahachie daily sheet exactly:
    OPEN/CLOSE are the machine's meter reading (ticket inventory value) at the start/end
@@ -1973,6 +2119,7 @@ function bodyChangeHandler(e){
   if(el.id==='bBgType'){st.brand.bgType=el.value;save();reRender()}
   if(el.id==='bAcc'){st.brand.accent=el.value;save();reRender()}
   if(el.id==='bAppAcc'){st.brand.appAccent=el.value;save();reRender()}
+  if(el.id==='intakeGame'){intakeAddNo=el.value}
   if(el.id==='adOn'){st.view.showAds=el.checked;save()}
   if(el.id==='jpOn'){st.view.showJp=el.checked;save()}
   if(el.id==='dwOn'){st.view.showDraws=el.checked;save()}
@@ -2025,6 +2172,19 @@ $('#cLotto').addEventListener('change',bodyChangeHandler);
 async function bodyClickHandler(e){
   const st=S(),b=e.target.closest('button');if(!b)return;const d=b.dataset,i=+(d.pick??d.link??d.wipe??d.adpick??d.adlink??d.adnoimg??d.addel??d.jpdel??d.wdel??d.acdel);
   if(d.goto){aTab=d.goto;renderAdmin();return}   // Home dashboard: jump to a tab
+  if(d.ichart){insightsChart=d.ichart;renderAdmin();return}
+  if(d.irange){insightsRange=d.irange;renderAdmin();return}
+  if(b.id==='intakeAdd'){
+    const no=$('#intakeGame').value,qty=+$('#intakeQty').value,date=$('#intakeDate').value;
+    const g=TX.find(x=>x.no===no);
+    if(!g){toast('Pick a game from the catalog');return}
+    if(!qty||qty<1){toast('Enter how many tickets');return}
+    st.intake=st.intake||[];
+    st.intake.push({date:date||new Date().toISOString().slice(0,10),gameNo:g.no,gameName:g.name,price:String(g.price),qty:String(qty),stage:'confirmed'});
+    intakeAddNo='';save();reRender();toast(`${qty} × ${g.name} logged as confirmed`);return;
+  }
+  if(d.intakeact!=null){st.intake[+d.intakeact].stage='activated';save();reRender();return}
+  if(d.intakedel!=null){if(confirm('Remove this batch?')){st.intake.splice(+d.intakedel,1);save();reRender()}return}
 
   if(d.pick!=null){const img=await pickImage();if(img){st.games[i].img=img;save();reRender();toast('Picture added')}}
   if(d.link!=null){const u=askLink(st.games[i].img);if(u!==null){st.games[i].img=u;save();reRender();toast(u?'Picture linked':'Picture cleared')}}
