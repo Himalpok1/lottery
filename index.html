@@ -2001,7 +2001,9 @@ function tabLotto(st){
       </div></div></div>
     <div class="panel"><div class="ph"><h3>Lotto machine reconciliation</h3>
       <span class="hint">SOLD = (OPEN − CLOSE) + ADD + ONLINE · the ${slotCount(st)} boxes' price×quantity should sum to CLOSE</span>
-      <div class="sp"></div><button class="btn sm" id="lottoCsv">Export CSV</button>
+      <div class="sp"></div><input type="date" class="in" id="ltLoadDate" style="width:150px" max="${today}">
+      <button class="btn sm" id="lottoLoad">Load day</button>
+      <button class="btn sm" id="lottoCsv">Export CSV</button>
       <button class="btn sm go" id="lottoAdd">Log a day</button></div>
     <div style="overflow-x:auto"><table>
       <thead><tr><th style="width:150px">Date</th><th style="width:100px">Open</th><th style="width:80px">Add</th>
@@ -2407,6 +2409,23 @@ async function bodyClickHandler(e){
     }
     st.lotto[d2]={shifts};syncLottoChain(st);
     save();ltEditDate=d2;reRender();toast('Today added — enter the box quantities; Close fills in from their total');
+  }
+  if(b.id==='lottoLoad'){
+    const d2=($('#ltLoadDate')||{}).value;
+    if(!d2){toast('Pick a date first');return}
+    st.lotto=st.lotto||{};
+    if(st.lotto[d2]){ltEditDate=d2;reRender();return}
+    // backfilling a day that was never logged — chain it from whichever logged day comes
+    // right before it (not necessarily the most recent one), same as inserting into the middle
+    const prevDate=Object.keys(st.lotto).filter(x=>x<d2).sort().reverse()[0];
+    const prevLast=prevDate?dayLast(st.lotto[prevDate]):null;
+    const shifts=[];for(let k=0;k<lottoShiftCount(st);k++)shifts.push(makeShift());
+    if(prevLast){
+      shifts[0].boxes=prevLast.boxes.map(b=>({game:String(b.game??''),price:String(b.price??''),qty:String(b.qty??'')}));
+      promoteNewBooks(st,prevLast,shifts[0]);
+    }
+    st.lotto[d2]={shifts};syncLottoChain(st);
+    save();ltEditDate=d2;reRender();toast(`${d2} added — enter the box quantities; Close fills in from their total`);
   }
   if(d.ltedit){ltEditDate=d.ltedit;reRender()}
   if(d.ltcloseauto!=null&&d.date){const sh=st.lotto[d.date].shifts[+d.ltcloseauto];if(sh){sh.closeAuto=true;sh.close='';syncLottoChain(st);save();reRender()}}
