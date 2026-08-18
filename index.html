@@ -1367,8 +1367,8 @@ function counterLottoView(st){
         const priceChanged=false;
         const delta=(!priceChanged&&prevB&&prevB.qty!==''&&b.qty!=='')?(+prevB.qty||0)-(+b.qty||0):null;
         const out=b.qty!==''&&+b.qty===0;
-        const name=b.game?b.game:(g.name||'— empty slot —');
-        const price=(b.price!==undefined&&b.price!=='')?b.price:(g.price!==''&&g.price!=null?g.price:'');
+        const name=g.name||'— empty slot —';
+        const price=(g.price!==''&&g.price!=null)?g.price:'';
         return `<div class="cboxrow ${out?'out':''} ${priceChanged?'newbook':''}">
           <span class="no">${i+1}</span>
           <div class="nm"><p class="g">${esc(name)}</p><p class="p">${price?'$'+esc(price):'—'}${priceChanged?' · new book':''}</p></div>
@@ -1925,7 +1925,7 @@ function tabIntake(st){
 const boxPrice=i=>+((S().games[i]||{}).price)||0;
 /* a box values at its own snapshot price × quantity left; snapshot defaults to the Games
    slot price but a swapped-in book keeps the price it was loaded at */
-const lottoBoxValue=(sh,i)=>{const b=(sh.boxes||[])[i]||{};const p=(b.price!==undefined&&b.price!=='')?+b.price:boxPrice(i);return (p||0)*(+b.qty||0)};
+const lottoBoxValue=(sh,i)=>boxPrice(i)*(+((sh.boxes||[])[i]||{}).qty||0);
 const lottoBoxTotal=sh=>(sh.boxes||[]).reduce((a,_,i)=>i<slotCount()?a+lottoBoxValue(sh,i):a,0);
 /* Close auto-fills from the box total unless typed over (closeAuto===false) */
 const effClose=sh=>sh.closeAuto===true?lottoBoxTotal(sh):(+sh.close||0);
@@ -1983,8 +1983,8 @@ function shiftEditor(st,d,day,si,prevBoxes){
       <thead><tr><th style="width:50px">Box</th><th>Game</th><th style="width:70px">Price</th><th style="width:110px">Quantity</th><th style="width:120px">Sold</th><th style="width:110px">Value</th></tr></thead>
       <tbody>${sh.boxes.slice(0,n).map((b,i)=>{const g=st.games[i]||{};const prevB=prevBoxes?prevBoxes[i]:null;
         const delta=(prevB&&prevB.qty!==''&&b.qty!=='')?(+prevB.qty||0)-(+b.qty||0):null;const out=b.qty!==''&&+b.qty===0;
-        return `<tr><td class="rno">${i+1}</td><td>${b.game?esc(b.game):(g.name?esc(g.name):'<span style="color:var(--ink-3)">— empty slot —</span>')}</td>
-          <td class="rno">${(b.price!==undefined&&b.price!=='')?'$'+esc(b.price):(g.price!==''&&g.price!=null?'$'+esc(g.price):'—')}</td>
+        return `<tr><td class="rno">${i+1}</td><td>${g.name?esc(g.name):'<span style="color:var(--ink-3)">— empty slot —</span>'}</td>
+          <td class="rno">${g.price!==''&&g.price!=null?'$'+esc(g.price):'—'}</td>
           <td><input class="in mono" data-ltqty="${i}" data-shift="${si}" data-date="${d}" value="${esc(b.qty)}" placeholder="0" style="width:90px">${out?'<span class="rno" style="color:#D62828;margin-left:6px">OUT</span>':''}</td>
           <td class="rno" style="${delta==null?'':delta>0?'color:#157F3B':delta<0?'color:#B8860B':''}">${delta==null?'—':delta===0?'0':(delta>0?delta+' sold':'+'+Math.abs(delta)+' added')}</td>
           <td class="rno">$${lottoBoxValue(sh,i).toFixed(2)}</td></tr>`}).join('')}
