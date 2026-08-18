@@ -350,6 +350,10 @@ button{font-family:inherit}
 .aSignOut{background:none;border:none;color:var(--ink-3);font-size:11.5px;font-weight:700;cursor:pointer;padding:2px}
 .aSignOut:hover{color:var(--r)}
 .amain{flex:1 1 auto;height:100vh;overflow-y:auto}
+#aNav{position:sticky;top:0;z-index:6;display:flex;align-items:center;gap:8px;background:var(--sf-2);
+  padding:10px 0 10px;margin:-26px 0 6px;border-bottom:1px solid var(--bd)}
+#aNav:empty{display:none}
+#aNav .btn{display:inline-flex;align-items:center;gap:5px}
 .awrap{max-width:1080px;margin:0 auto;padding:26px 28px 90px}
 @media(max-width:900px){
   #admin{flex-direction:column}
@@ -563,6 +567,7 @@ tr:hover td{background:var(--r-lt)}
     </div>
   </div>
   <div class="amain"><div class="awrap">
+    <div id="aNav"></div>
     <div id="aBody"></div>
   </div></div>
 </div>
@@ -851,6 +856,8 @@ const ICONS={
   clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
   lock:'<rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 018 0v4"/>',
   settings:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1 1.55V21a2 2 0 01-4 0v-.09a1.7 1.7 0 00-1-1.55 1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.7 1.7 0 00.34-1.87 1.7 1.7 0 00-1.55-1H3a2 2 0 010-4h.09a1.7 1.7 0 001.55-1 1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06a1.7 1.7 0 001.87.34H9a1.7 1.7 0 001-1.55V3a2 2 0 014 0v.09a1.7 1.7 0 001 1.55 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06a1.7 1.7 0 00-.34 1.87V9a1.7 1.7 0 001.55 1H21a2 2 0 010 4h-.09a1.7 1.7 0 00-1.55 1z"/>',
+  back:'<path d="M15 6l-6 6 6 6"/>',
+  top:'<path d="M12 20V6"/><path d="M6 12l6-6 6 6"/>',
 };
 const icon=(name,size=18)=>`<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]||''}</svg>`;
 const TAB_ICON={home:'home',games:'games',settings:'settings',ads:'ads',sales:'sales',intake:'inventory',lotto:'lotto',data:'data'};
@@ -914,12 +921,10 @@ const normalizeDb=d=>{
     // Boxes mirror the 40 game slots 1-to-1 (box i IS slot i, priced from the Games tab).
     // A day is now {shifts:[…]}. Migrate older shapes: a flat single-day entry becomes one
     // shift; 38-box / bare-qty arrays get carried across by index and padded to 40.
-    // each box snapshots its game+price (so a swapped-in book keeps its own price) plus
-    // the quantity left; a shift also holds staged newBooks for the next shift/day
-    const gn=i=>String((s.games[i]||{}).name||''),gp=i=>String((s.games[i]||{}).price||'');
+    // boxes store only the quantity left; a box's game + price are read live from its
+    // Games slot, so changing a slot's game/price shows through to the log day right away
     const fixBoxes=(ob,oq)=>Array.from({length:40},(_,i)=>{const b=(ob&&ob[i])||{};
-      return {game:(b.game!==undefined&&b.game!=='')?String(b.game):gn(i),price:(b.price!==undefined&&b.price!=='')?String(b.price):gp(i),
-        qty:b.qty!==undefined?String(b.qty??''):(oq?String(oq[i]||''):'')}});
+      return {qty:b.qty!==undefined?String(b.qty??''):(oq?String(oq[i]||''):'')}});
     Object.values(s.lotto).forEach(e=>{
       if(!Array.isArray(e.shifts)){
         const sh={clerk:'',open:e.open??'',openAuto:e.openAuto,add:e.add??'',online:e.online??'',close:e.close??'',closeAuto:e.closeAuto,
@@ -1323,7 +1328,7 @@ function counterLottoView(st){
   const q=cBoxFilter.trim().toLowerCase();
   const rows=sh.boxes.slice(0,n).map((b,i)=>({b,i})).filter(({b,i})=>{
     if(!q)return true;
-    return String(i+1).includes(q)||(b.game||'').toLowerCase().includes(q);
+    return String(i+1).includes(q)||((st.games[i]||{}).name||'').toLowerCase().includes(q);
   });
   const enteredCount=sh.boxes.slice(0,n).filter(b=>b.qty!=='').length;
 
@@ -1359,7 +1364,7 @@ function counterLottoView(st){
       ${rows.map(({b,i})=>{
         const g=st.games[i]||{};
         const prevB=prevBoxes?prevBoxes[i]:null;
-        const priceChanged=prevB&&prevB.price!==''&&b.price!==''&&+prevB.price!==+b.price;
+        const priceChanged=false;
         const delta=(!priceChanged&&prevB&&prevB.qty!==''&&b.qty!=='')?(+prevB.qty||0)-(+b.qty||0):null;
         const out=b.qty!==''&&+b.qty===0;
         const name=b.game?b.game:(g.name||'— empty slot —');
@@ -1473,6 +1478,10 @@ function renderAdmin(){
   $('#aTabs').innerHTML=tabs.map(([k,l])=>`<button class="vtab ${aTab===k?'on':''}" data-tab="${k}">${icon(TAB_ICON[k]||'tag',17)}<span>${l}</span></button>`).join('');
   $('#aBody').innerHTML=({home:tabHome,games:tabGames,settings:tabSettings,ads:tabAds,jackpots:tabJp,winners:tabWin,
     sales:tabSalesAndInsights,intake:tabIntake,lotto:tabLotto,data:tabData}[aTab]||tabGames)(st);
+  $('#aNav').innerHTML = aTab==='home' ? '' :
+    `<button class="btn sm" data-goto="home">${icon('back',15)}Back</button>
+     <span style="flex:1"></span>
+     <button class="btn sm" id="aTop">${icon('top',15)}Top</button>`;
 }
 function tabGames(st){
   const n=slotCount(st);
@@ -1506,12 +1515,12 @@ function tabGames(st){
             <option value="oos" ${g.status==='oos'?'selected':''}>Out of stock</option>
             <option value="soon" ${g.status==='soon'?'selected':''}>Coming soon</option>
           </select></td>
-        <td><select class="in mono" data-swap="${i}" style="width:130px;font-size:12px">
-          <option value="">Swap with…</option>
+        <td><select class="in mono" data-swap="${i}" ${(g.status==='oos'||g.status==='soon')?'disabled title="Locked while Out of Stock / Coming Soon — clear the status to swap"':''} style="width:130px;font-size:12px${(g.status==='oos'||g.status==='soon')?';opacity:.45;background:var(--sf-2)':''}">
+          <option value="">${(g.status==='oos'||g.status==='soon')?'Locked':'Swap with…'}</option>
           ${st.games.slice(0,n).map((s,j)=>j===i?'':`<option value="${j}">${String(s.slot).padStart(2,'0')} · ${filled(s)?esc(s.name.slice(0,14)):'open'}</option>`).join('')}
         </select></td>
-        <td><select class="in mono" data-assign="${i}" style="width:160px;font-size:12px">
-          <option value="">${filled(g)?'Replace with…':'Assign game…'}</option>
+        <td><select class="in mono" data-assign="${i}" ${(g.status==='oos'||g.status==='soon')?'disabled title="Locked while Out of Stock / Coming Soon — clear the status to replace"':''} style="width:160px;font-size:12px${(g.status==='oos'||g.status==='soon')?';opacity:.45;background:var(--sf-2)':''}">
+          <option value="">${(g.status==='oos'||g.status==='soon')?'Locked':(filled(g)?'Replace with…':'Assign game…')}</option>
           ${TX.map(t=>{const at=st.games.findIndex(x=>String(x.no)===t.no);
             return `<option value="${t.no}">${esc(t.no)} · ${esc(t.name.slice(0,20))} ($${t.price})${at>=0?' — on '+String(at+1).padStart(2,'0'):''}</option>`}).join('')}
         </select></td>
@@ -1938,7 +1947,7 @@ function lottoTimeline(st){const out=[];Object.keys(st.lotto||{}).sort().forEach
 function syncLottoChain(st){const tl=lottoTimeline(st);for(let k=1;k<tl.length;k++){if(tl[k].openAuto!==false)tl[k].open=effClose(tl[k-1]).toFixed(2)}}
 const lottoShiftCount=st=>Math.min(2,Math.max(1,+(((st||S()).view||{}).lottoShifts)||1));
 const lottoShiftName=(st,i)=>{const nm=((st||S()).view||{}).lottoShiftNames;return (Array.isArray(nm)&&nm[i]&&String(nm[i]).trim())?nm[i]:('Shift '+(i+1))};
-const makeShift=()=>({clerk:'',open:'',openAuto:true,add:'',online:'',close:'',closeAuto:true,boxes:Array.from({length:40},(_,i)=>({game:String((S().games[i]||{}).name||''),price:String((S().games[i]||{}).price||''),qty:''})),newBooks:[]});
+const makeShift=()=>({clerk:'',open:'',openAuto:true,add:'',online:'',close:'',closeAuto:true,boxes:Array.from({length:40},()=>({qty:''})),newBooks:[]});
 const lottoNbRow=(sh,r)=>{sh.newBooks=sh.newBooks||[];while(sh.newBooks.length<=r)sh.newBooks.push({slot:'',no:''});return sh.newBooks[r]};
 /* promote a shift's staged new books into the next shift: swap the slot's game on the
    board, and start that box's fresh book (its quantity gets counted next shift) */
@@ -1980,18 +1989,6 @@ function shiftEditor(st,d,day,si,prevBoxes){
           <td class="rno" style="${delta==null?'':delta>0?'color:#157F3B':delta<0?'color:#B8860B':''}">${delta==null?'—':delta===0?'0':(delta>0?delta+' sold':'+'+Math.abs(delta)+' added')}</td>
           <td class="rno">$${lottoBoxValue(sh,i).toFixed(2)}</td></tr>`}).join('')}
       </tbody></table></div>
-    <div style="margin-top:12px"><div class="rno" style="color:var(--ink-3);margin-bottom:6px">NEW BOOKS LOADED — each takes over its slot at the next shift or day</div>
-      <div style="overflow-x:auto"><table>
-        <thead><tr><th style="width:64px">Slot</th><th>New game (from catalog)</th><th style="width:70px"></th></tr></thead>
-        <tbody>${Array.from({length:4},(_,r)=>{const row=(sh.newBooks||[])[r]||{};
-          return `<tr>
-            <td><input class="in mono" data-ltnbslot="${r}" data-shift="${si}" data-date="${d}" value="${esc(row.slot||'')}" placeholder="#" style="width:52px"></td>
-            <td><select class="in mono" data-ltnbno="${r}" data-shift="${si}" data-date="${d}" style="width:260px;font-size:12px">
-              <option value="">— pick the new book's game —</option>
-              ${(TX&&TX.length?TX:[]).map(t=>`<option value="${esc(t.no)}" ${String(row.no)===String(t.no)?'selected':''}>${esc(t.no)} · ${esc((t.name||'').slice(0,22))} ($${t.price})</option>`).join('')}
-            </select></td>
-            <td>${row.no?'<span class="rno" style="color:#157F3B">staged</span>':''}</td></tr>`}).join('')}
-        </tbody></table></div></div>
     </div></div>`;
 }
 function tabLotto(st){
@@ -2252,6 +2249,9 @@ function txAutoFill(st){
    so reRender needs to redraw whichever of the two is actually on screen */
 function reRender(){applyAppTheme(S());location.hash==='#counter'?renderCounter():renderAdmin()}
 $('#aTabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(!b)return;aTab=b.dataset.tab;renderAdmin()});
+$('#aNav').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.id==='aTop'){$('.amain').scrollTo({top:0,behavior:'smooth'});return}
+  if(b.dataset.goto){aTab=b.dataset.goto;renderAdmin();$('.amain').scrollTop=0}});
 $('#aStore').addEventListener('change',e=>{db.active=e.target.value;save();renderAdmin()});
 
 /* shared by the Backend's #aBody and the counter's #cLotto — same data-* attributes
