@@ -2218,6 +2218,17 @@ function txAssign(st,no,idx){
   s.current='';s.status='';
   return true;
 }
+/* write a catalog game into a slot even if it's already on the board — used to put the
+   same ticket on two slots on purpose (a copy), rather than swapping */
+function txCopy(st,no,idx){
+  const g=TX.find(x=>x.no===no);if(!g||idx==null||idx<0||idx>39)return false;
+  const s=st.games[idx];
+  s.no=g.no;s.name=g.name;s.price=String(g.price);s.img=g.img;s.isNew=g.isNew;s.isLucky=g.feat;
+  s.closing=!!g.closing;s.endDate=g.endDate||'';
+  s.prizesLeft=g.prizesLeft!=null?String(g.prizesLeft):'';
+  s.current='';s.status='';
+  return true;
+}
 /* bulk add still fills the open slots in order */
 function txAdd(st,no){
   const g=TX.find(x=>x.no===no);if(!g)return false;
@@ -2315,10 +2326,15 @@ function bodyChangeHandler(e){
   if(el.dataset.assign!=null&&el.value!==''){
     const idx=+el.dataset.assign,no=el.value,g=TX.find(x=>x.no===no);
     const onBoardAt=st.games.findIndex(x=>String(x.no)===no);
+    if(onBoardAt>=0&&onBoardAt!==idx){
+      const copy=confirm(`"${g?g.name:no}" is already on slot ${String(onBoardAt+1).padStart(2,'0')}.\n\nOK  = put a COPY on slot ${String(idx+1).padStart(2,'0')} (same ticket on two slots)\nCancel = SWAP the two slots`);
+      if(copy)txCopy(st,no,idx);else txAssign(st,no,idx);
+      save();reRender();
+      toast(copy?`Copy of #${no} → slot ${String(idx+1).padStart(2,'0')}`:`Slot ${String(idx+1).padStart(2,'0')} ↔ ${String(onBoardAt+1).padStart(2,'0')}`);
+      return;
+    }
     txAssign(st,no,idx);save();reRender();
-    toast(onBoardAt>=0&&onBoardAt!==idx
-      ? `Slot ${String(idx+1).padStart(2,'0')} ↔ ${String(onBoardAt+1).padStart(2,'0')}`
-      : `#${no} ${g?g.name:''} → slot ${String(idx+1).padStart(2,'0')}`);
+    toast(`#${no} ${g?g.name:''} → slot ${String(idx+1).padStart(2,'0')}`);
     return;
   }
   if(el.dataset.ac==='role'){
@@ -2339,13 +2355,18 @@ function bodyChangeHandler(e){
     if(el.value===''){return}
     const idx=+el.value,target=st.games[idx];
     const onBoardAt=st.games.findIndex(x=>String(x.no)===no);
+    if(onBoardAt>=0&&onBoardAt!==idx){
+      const copy=confirm(`"${(TX.find(x=>x.no===no)||{}).name||no}" is already on slot ${String(onBoardAt+1).padStart(2,'0')}.\n\nOK  = put a COPY on slot ${String(idx+1).padStart(2,'0')} (same ticket on two slots)\nCancel = SWAP the two slots`);
+      if(copy)txCopy(st,no,idx);else txAssign(st,no,idx);
+      save();reRender();
+      toast(copy?`Copy → slot ${String(idx+1).padStart(2,'0')}`:`Slot ${String(onBoardAt+1).padStart(2,'0')} ↔ ${String(idx+1).padStart(2,'0')}`);
+      return;
+    }
     if(onBoardAt<0&&filled(target)){
       if(!confirm(`Slot ${String(target.slot).padStart(2,'0')} already holds "${target.name}".\n\nReplace it with "${TX.find(x=>x.no===no).name}"?`)){renderAdmin();return}
     }
     txAssign(st,no,idx);save();reRender();
-    toast(onBoardAt>=0
-      ? `Slot ${String(onBoardAt+1).padStart(2,'0')} ↔ ${String(idx+1).padStart(2,'0')}`
-      : `#${no} → slot ${String(idx+1).padStart(2,'0')}`);
+    toast(`#${no} → slot ${String(idx+1).padStart(2,'0')}`);
   }
 }
 $('#aBody').addEventListener('change',bodyChangeHandler);
